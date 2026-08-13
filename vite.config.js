@@ -10,6 +10,7 @@ export default defineConfig({
       includeAssets: ['apple-touch-icon.png'],
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB, up from the 2 MB default
+        navigateFallbackDenylist: [/^\/\.netlify\/functions\//, /^\/api\//],
       },
       manifest: {
         name: 'True Herf Cigar Journal',
