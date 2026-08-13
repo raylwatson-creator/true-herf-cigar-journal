@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Plus, Search, Camera, ChevronLeft, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil } from 'lucide-react';
 
-const ENTRIES_API = '/api/entries';
+const ENTRIES_API = '/.netlify/functions/entries';
 const DEVICE_ID_KEY = 'cigar-device-id';
 
 function getDeviceId() {
