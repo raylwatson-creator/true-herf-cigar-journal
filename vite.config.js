@@ -8,6 +8,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['apple-touch-icon.png'],
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB, up from the 2 MB default
+      },
       manifest: {
         name: 'True Herf Cigar Journal',
         short_name: 'True Herf',
