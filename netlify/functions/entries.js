@@ -2,11 +2,11 @@ import { getDatabase } from "@netlify/database";
 
 const db = getDatabase();
 
-const json = (statusCode, body) => ({
-  statusCode,
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(body),
-});
+const json = (statusCode, body) =>
+  new Response(JSON.stringify(body), {
+    status: statusCode,
+    headers: { "Content-Type": "application/json" },
+  });
 
 const rowToEntry = (row) => ({ id: row.id, ...row.data });
 
