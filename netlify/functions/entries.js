@@ -71,5 +71,3 @@ export default async (req) => {
     return json(500, { error: String(e && e.message ? e.message : e) });
   }
 };
-
-export const config = { path: "/api/entries" };
