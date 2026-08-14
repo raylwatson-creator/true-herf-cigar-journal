@@ -513,8 +513,8 @@ export default function CigarJournal() {
         .font-serif, .font-serif * { font-family: 'Fraunces', serif; }
         .app-shell {
           background-image:
-            radial-gradient(ellipse 700px 420px at 50% -8%, rgba(201,162,39,0.16), transparent 62%),
-            linear-gradient(180deg, rgba(11,16,42,0.94) 0%, rgba(8,11,32,0.96) 45%, rgba(5,8,23,0.98) 100%),
+            radial-gradient(ellipse 700px 420px at 50% -8%, rgba(201,162,39,0.18), transparent 62%),
+            linear-gradient(180deg, rgba(22,30,68,0.74) 0%, rgba(18,25,58,0.78) 45%, rgba(14,20,48,0.82) 100%),
             url(${CIGAR_BG_IMG});
           background-size: auto, auto, cover;
           background-position: center, center, center 25%;
@@ -1488,11 +1488,11 @@ function GuideView() {
         <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>
           How to Light a Cigar
         </div>
-        <div className="p-3 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+        <div className="-mx-5 rounded-xl overflow-hidden" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
           <img
             src={LIGHTING_GUIDE_IMG}
             alt="Guide to lighting a cigar"
-            className="w-full rounded-lg"
+            className="w-full"
           />
         </div>
       </div>
