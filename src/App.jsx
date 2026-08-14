@@ -1110,7 +1110,7 @@ const inputStyle = {
   padding: '10px 12px',
   borderRadius: 8,
   border: '1px solid #d8c9a3',
-  background: '#f3e9d8',
+  background: 'rgba(243,233,216,0.85)',
   color: '#0a0f2e',
   fontSize: 14,
   outline: 'none',
