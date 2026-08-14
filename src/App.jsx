@@ -4,6 +4,38 @@ import { Plus, Search, Camera, ChevronLeft, BarChart2, BookOpen, Trash2, Downloa
 
 const ENTRIES_API = '/.netlify/functions/entries';
 const DEVICE_ID_KEY = 'cigar-device-id';
+const AUTH_TOKEN_KEY = 'cigar-auth-token';
+const AUTH_EMAIL_KEY = 'cigar-auth-email';
+const SIGNUP_API = '/.netlify/functions/auth-signup';
+const LOGIN_API = '/.netlify/functions/auth-login';
+const RESET_REQUEST_API = '/.netlify/functions/auth-reset-request';
+const RESET_CONFIRM_API = '/.netlify/functions/auth-reset-confirm';
+
+function getStoredAuth() {
+  try {
+    const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+    const email = window.localStorage.getItem(AUTH_EMAIL_KEY);
+    return token ? { token, email } : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function storeAuth(token, email) {
+  try {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+    window.localStorage.setItem(AUTH_EMAIL_KEY, email || '');
+  } catch (e) {
+    // localStorage unavailable — session will just be tab-lived via React state
+  }
+}
+
+function clearStoredAuth() {
+  try {
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    window.localStorage.removeItem(AUTH_EMAIL_KEY);
+  } catch (e) {}
+}
 
 function getDeviceId() {
   try {
@@ -403,8 +435,163 @@ function Stars({ value, onChange, size = 22 }) {
   );
 }
 
-// ---- main app ----
-export default function CigarJournal() {
+function GlobalStyles() {
+  return (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+    .font-serif { font-family: 'Fraunces', serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    * { font-family: 'Source Sans 3', ui-sans-serif, system-ui; }
+    .font-serif, .font-serif * { font-family: 'Fraunces', serif; }
+    .app-shell {
+      background-image:
+        radial-gradient(ellipse 700px 420px at 50% -8%, rgba(201,162,39,0.18), transparent 62%),
+        linear-gradient(180deg, rgba(22,30,68,0.74) 0%, rgba(18,25,58,0.78) 45%, rgba(14,20,48,0.82) 100%),
+        url(${CIGAR_BG_IMG});
+      background-size: auto, auto, cover;
+      background-position: center, center, center 25%;
+      background-repeat: no-repeat, no-repeat, no-repeat;
+      background-attachment: scroll, scroll, fixed;
+    }
+    .grain {
+      position: absolute; inset: 0; opacity: 0.05; mix-blend-mode: overlay; pointer-events: none;
+      background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    input::placeholder, textarea::placeholder { color: #3c4576; }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7) sepia(1) saturate(2) hue-rotate(-10deg); }
+
+    .splash-screen {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+      background-image:
+        radial-gradient(ellipse 700px 500px at 50% 40%, rgba(201,162,39,0.1), transparent 65%),
+        url(${CIGAR_BG_IMG});
+      background-size: auto, cover;
+      background-position: center, center 38%;
+      background-repeat: no-repeat, no-repeat;
+      animation: splashFade 2.6s ease forwards;
+    }
+    .splash-ember {
+      position: absolute; border-radius: 9999px; pointer-events: none; z-index: 3;
+      background: radial-gradient(circle, rgba(209,112,60,0.9), rgba(209,112,60,0) 70%);
+      opacity: 0; animation: emberRise 2.2s ease-out forwards;
+    }
+    .splash-band {
+      width: 92px; height: 92px; border-radius: 9999px; position: relative;
+      background: radial-gradient(circle at 32% 28%, #f6ecd9, #e7d4ad 55%, #c9a227 100%);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.55), inset 0 0 0 3px #9c7a3c;
+      opacity: 0; transform: scale(0.7);
+      animation: bandPop 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+    }
+    .splash-band::after {
+      content: ''; position: absolute; inset: 6px; border-radius: 9999px; border: 1px solid #9c7a3c66;
+    }
+    .splash-wordmark {
+      margin-top: 22px; text-align: center; opacity: 0; transform: translateY(8px);
+      animation: wordmarkIn 0.7s ease 0.55s forwards;
+    }
+    .splash-title {
+      font-family: 'Fraunces', serif; font-weight: 600; font-size: 26px; color: #f3e9d8; letter-spacing: -0.01em;
+    }
+    .splash-sub {
+      font-family: 'Fraunces', serif; font-style: italic; font-size: 13px; color: #c9a227; margin-top: 4px; letter-spacing: 0.02em;
+    }
+    .splash-vignette {
+      position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background: radial-gradient(ellipse 62% 55% at 50% 42%, rgba(5,8,23,0.35) 0%, rgba(5,8,23,0.72) 65%, rgba(5,8,23,0.95) 100%);
+    }
+    .smoke-sheet {
+      position: absolute; inset: -25% -25%; pointer-events: none; z-index: 3;
+      background-image: url(${SMOKE_IMG});
+      background-size: 140% auto;
+      background-position: center 60%;
+      background-repeat: no-repeat;
+      mix-blend-mode: screen;
+      filter: blur(4px);
+      opacity: 0;
+      animation: smokeSheetRoll 1.5s ease-in forwards;
+      animation-delay: 1.45s;
+    }
+    .smoke-wisp {
+      position: absolute; bottom: 45%; pointer-events: none; z-index: 3;
+      background-image: url(${SMOKE_IMG});
+      background-size: cover;
+      mix-blend-mode: screen;
+      filter: blur(2px);
+      opacity: 0;
+      animation: smokeRise 2s ease-out forwards;
+    }
+    @keyframes splashFade {
+      0% { opacity: 1; }
+      68% { opacity: 1; }
+      100% { opacity: 0; visibility: hidden; }
+    }
+    @keyframes bandPop {
+      0% { opacity: 0; transform: scale(0.7); }
+      70% { opacity: 1; transform: scale(1.06); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    @keyframes wordmarkIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes emberRise {
+      0% { opacity: 0; transform: translateY(0) scale(0.6); }
+      20% { opacity: 0.7; }
+      100% { opacity: 0; transform: translateY(-60px) scale(1.1); }
+    }
+    @keyframes smokeRise {
+      0% { opacity: 0; transform: translateY(0) translateX(0) scale(0.4); filter: blur(6px); }
+      14% { opacity: 0.85; }
+      50% { opacity: 0.75; }
+      100% { opacity: 0; transform: translateY(-220px) translateX(var(--drift, 0px)) scale(3.4); filter: blur(22px); }
+    }
+    @keyframes smokeSheetRoll {
+      0% { opacity: 0; transform: scale(0.9) translateY(30px); }
+      30% { opacity: 0.9; }
+      65% { opacity: 0.85; transform: scale(1.15) translateY(-10px); }
+      100% { opacity: 0; transform: scale(1.5) translateY(-90px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .splash-screen, .splash-band, .splash-wordmark, .splash-ember, .smoke-wisp, .smoke-sheet { animation: none !important; opacity: 1 !important; transform: none !important; }
+      .smoke-wisp, .smoke-sheet { opacity: 0 !important; }
+      .splash-screen { animation: splashFade 2.6s linear forwards; }
+    }
+
+    /* ---- 3D tactile buttons ---- */
+    button { -webkit-tap-highlight-color: transparent; }
+    .btn-raised {
+      box-shadow: 0 4px 0 rgba(0,0,0,0.42), 0 7px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.18);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+    }
+    .btn-raised:active {
+      transform: translateY(4px);
+      box-shadow: 0 0px 0 rgba(0,0,0,0.42), 0 2px 5px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+    .btn-raised-sm {
+      box-shadow: 0 3px 0 rgba(0,0,0,0.4), 0 4px 9px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+    }
+    .btn-raised-sm:active {
+      transform: translateY(3px);
+      box-shadow: 0 0px 0 rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .btn-pressed {
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), inset 0 -1px 0 rgba(255,255,255,0.06) !important;
+      transform: translateY(2px) !important;
+    }
+    .btn-pressed-sm {
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.45), inset 0 -1px 0 rgba(255,255,255,0.05) !important;
+      transform: translateY(2px) !important;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .btn-raised, .btn-raised-sm { transition: none; }
+    }
+  `}</style>
+  );
+}
+
+// ---- main app (requires an authenticated session) ----
+function CigarJournal({ authToken, userEmail, onLogout }) {
   const [entries, setEntries] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState('list');
@@ -412,8 +599,18 @@ export default function CigarJournal() {
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [showSplash, setShowSplash] = useState(true);
-  const deviceIdRef = useRef(null);
-  if (deviceIdRef.current === null) deviceIdRef.current = getDeviceId();
+
+  const authFetch = async (url, options = {}) => {
+    const res = await fetch(url, {
+      ...options,
+      headers: { ...(options.headers || {}), Authorization: `Bearer ${authToken}` },
+    });
+    if (res.status === 401) {
+      onLogout();
+      throw new Error('session expired');
+    }
+    return res;
+  };
 
   useEffect(() => {
     const t = setTimeout(() => setShowSplash(false), 2600);
@@ -423,7 +620,7 @@ export default function CigarJournal() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${ENTRIES_API}?deviceId=${encodeURIComponent(deviceIdRef.current)}`);
+        const res = await authFetch(ENTRIES_API);
         if (res.ok) {
           const data = await res.json();
           setEntries(data);
@@ -440,10 +637,10 @@ export default function CigarJournal() {
 
   const addEntry = async (entry) => {
     try {
-      const res = await fetch(ENTRIES_API, {
+      const res = await authFetch(ENTRIES_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId: deviceIdRef.current, entry }),
+        body: JSON.stringify({ entry }),
       });
       if (!res.ok) throw new Error('save failed');
       const created = await res.json();
@@ -456,10 +653,10 @@ export default function CigarJournal() {
 
   const editEntry = async (updated) => {
     try {
-      const res = await fetch(ENTRIES_API, {
+      const res = await authFetch(ENTRIES_API, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId: deviceIdRef.current, id: activeId, entry: updated }),
+        body: JSON.stringify({ id: activeId, entry: updated }),
       });
       if (!res.ok) throw new Error('update failed');
       const saved = await res.json();
@@ -472,10 +669,10 @@ export default function CigarJournal() {
 
   const deleteEntry = async (id) => {
     try {
-      const res = await fetch(ENTRIES_API, {
+      const res = await authFetch(ENTRIES_API, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId: deviceIdRef.current, id }),
+        body: JSON.stringify({ id }),
       });
       if (!res.ok) throw new Error('delete failed');
       setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -505,156 +702,7 @@ export default function CigarJournal() {
   return (
     <div className="min-h-screen w-full relative" style={{ fontFamily: "'Source Sans 3', ui-sans-serif, system-ui" }}>
       {showSplash && <SplashScreen />}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
-        .font-serif { font-family: 'Fraunces', serif; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
-        * { font-family: 'Source Sans 3', ui-sans-serif, system-ui; }
-        .font-serif, .font-serif * { font-family: 'Fraunces', serif; }
-        .app-shell {
-          background-image:
-            radial-gradient(ellipse 700px 420px at 50% -8%, rgba(201,162,39,0.18), transparent 62%),
-            linear-gradient(180deg, rgba(22,30,68,0.74) 0%, rgba(18,25,58,0.78) 45%, rgba(14,20,48,0.82) 100%),
-            url(${CIGAR_BG_IMG});
-          background-size: auto, auto, cover;
-          background-position: center, center, center 25%;
-          background-repeat: no-repeat, no-repeat, no-repeat;
-          background-attachment: scroll, scroll, fixed;
-        }
-        .grain {
-          position: absolute; inset: 0; opacity: 0.05; mix-blend-mode: overlay; pointer-events: none;
-          background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-        }
-        input::placeholder, textarea::placeholder { color: #3c4576; }
-        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7) sepia(1) saturate(2) hue-rotate(-10deg); }
-
-        .splash-screen {
-          position: fixed; inset: 0; z-index: 50;
-          display: flex; align-items: center; justify-content: center;
-          background-image:
-            radial-gradient(ellipse 700px 500px at 50% 40%, rgba(201,162,39,0.1), transparent 65%),
-            url(${CIGAR_BG_IMG});
-          background-size: auto, cover;
-          background-position: center, center 38%;
-          background-repeat: no-repeat, no-repeat;
-          animation: splashFade 2.6s ease forwards;
-        }
-        .splash-ember {
-          position: absolute; border-radius: 9999px; pointer-events: none; z-index: 3;
-          background: radial-gradient(circle, rgba(209,112,60,0.9), rgba(209,112,60,0) 70%);
-          opacity: 0; animation: emberRise 2.2s ease-out forwards;
-        }
-        .splash-band {
-          width: 92px; height: 92px; border-radius: 9999px; position: relative;
-          background: radial-gradient(circle at 32% 28%, #f6ecd9, #e7d4ad 55%, #c9a227 100%);
-          box-shadow: 0 6px 24px rgba(0,0,0,0.55), inset 0 0 0 3px #9c7a3c;
-          opacity: 0; transform: scale(0.7);
-          animation: bandPop 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
-        }
-        .splash-band::after {
-          content: ''; position: absolute; inset: 6px; border-radius: 9999px; border: 1px solid #9c7a3c66;
-        }
-        .splash-wordmark {
-          margin-top: 22px; text-align: center; opacity: 0; transform: translateY(8px);
-          animation: wordmarkIn 0.7s ease 0.55s forwards;
-        }
-        .splash-title {
-          font-family: 'Fraunces', serif; font-weight: 600; font-size: 26px; color: #f3e9d8; letter-spacing: -0.01em;
-        }
-        .splash-sub {
-          font-family: 'Fraunces', serif; font-style: italic; font-size: 13px; color: #c9a227; margin-top: 4px; letter-spacing: 0.02em;
-        }
-        .splash-vignette {
-          position: absolute; inset: 0; pointer-events: none; z-index: 0;
-          background: radial-gradient(ellipse 62% 55% at 50% 42%, rgba(5,8,23,0.35) 0%, rgba(5,8,23,0.72) 65%, rgba(5,8,23,0.95) 100%);
-        }
-        .smoke-sheet {
-          position: absolute; inset: -25% -25%; pointer-events: none; z-index: 3;
-          background-image: url(${SMOKE_IMG});
-          background-size: 140% auto;
-          background-position: center 60%;
-          background-repeat: no-repeat;
-          mix-blend-mode: screen;
-          filter: blur(4px);
-          opacity: 0;
-          animation: smokeSheetRoll 1.5s ease-in forwards;
-          animation-delay: 1.45s;
-        }
-        .smoke-wisp {
-          position: absolute; bottom: 45%; pointer-events: none; z-index: 3;
-          background-image: url(${SMOKE_IMG});
-          background-size: cover;
-          mix-blend-mode: screen;
-          filter: blur(2px);
-          opacity: 0;
-          animation: smokeRise 2s ease-out forwards;
-        }
-        @keyframes splashFade {
-          0% { opacity: 1; }
-          68% { opacity: 1; }
-          100% { opacity: 0; visibility: hidden; }
-        }
-        @keyframes bandPop {
-          0% { opacity: 0; transform: scale(0.7); }
-          70% { opacity: 1; transform: scale(1.06); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-        @keyframes wordmarkIn {
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes emberRise {
-          0% { opacity: 0; transform: translateY(0) scale(0.6); }
-          20% { opacity: 0.7; }
-          100% { opacity: 0; transform: translateY(-60px) scale(1.1); }
-        }
-        @keyframes smokeRise {
-          0% { opacity: 0; transform: translateY(0) translateX(0) scale(0.4); filter: blur(6px); }
-          14% { opacity: 0.85; }
-          50% { opacity: 0.75; }
-          100% { opacity: 0; transform: translateY(-220px) translateX(var(--drift, 0px)) scale(3.4); filter: blur(22px); }
-        }
-        @keyframes smokeSheetRoll {
-          0% { opacity: 0; transform: scale(0.9) translateY(30px); }
-          30% { opacity: 0.9; }
-          65% { opacity: 0.85; transform: scale(1.15) translateY(-10px); }
-          100% { opacity: 0; transform: scale(1.5) translateY(-90px); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .splash-screen, .splash-band, .splash-wordmark, .splash-ember, .smoke-wisp, .smoke-sheet { animation: none !important; opacity: 1 !important; transform: none !important; }
-          .smoke-wisp, .smoke-sheet { opacity: 0 !important; }
-          .splash-screen { animation: splashFade 2.6s linear forwards; }
-        }
-
-        /* ---- 3D tactile buttons ---- */
-        button { -webkit-tap-highlight-color: transparent; }
-        .btn-raised {
-          box-shadow: 0 4px 0 rgba(0,0,0,0.42), 0 7px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.18);
-          transition: transform 0.08s ease, box-shadow 0.08s ease;
-        }
-        .btn-raised:active {
-          transform: translateY(4px);
-          box-shadow: 0 0px 0 rgba(0,0,0,0.42), 0 2px 5px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
-        }
-        .btn-raised-sm {
-          box-shadow: 0 3px 0 rgba(0,0,0,0.4), 0 4px 9px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
-          transition: transform 0.08s ease, box-shadow 0.08s ease;
-        }
-        .btn-raised-sm:active {
-          transform: translateY(3px);
-          box-shadow: 0 0px 0 rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08);
-        }
-        .btn-pressed {
-          box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), inset 0 -1px 0 rgba(255,255,255,0.06) !important;
-          transform: translateY(2px) !important;
-        }
-        .btn-pressed-sm {
-          box-shadow: inset 0 2px 4px rgba(0,0,0,0.45), inset 0 -1px 0 rgba(255,255,255,0.05) !important;
-          transform: translateY(2px) !important;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .btn-raised, .btn-raised-sm { transition: none; }
-        }
-      `}</style>
+      <GlobalStyles />
 
       <div className="app-shell min-h-screen w-full absolute inset-0" />
       <div className="grain" />
@@ -681,7 +729,7 @@ export default function CigarJournal() {
         ) : view === 'stats' ? (
           <StatsView entries={entries} />
         ) : view === 'guide' ? (
-          <GuideView />
+          <GuideView userEmail={userEmail} onLogout={onLogout} />
         ) : view === 'detail' && active ? (
           <DetailView entry={active} onDelete={deleteEntry} onEdit={() => setView('edit')} />
         ) : null}
@@ -1468,7 +1516,8 @@ function StatCard({ label, value, suffix }) {
   );
 }
 
-function GuideView() {
+function GuideView({ userEmail, onLogout }) {
+  const [confirming, setConfirming] = useState(false);
   return (
     <div className="px-5 pt-4 pb-10 flex flex-col gap-6">
       <div>
@@ -1510,8 +1559,390 @@ function GuideView() {
           />
         </div>
       </div>
+
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>
+          Account
+        </div>
+        <div className="p-4 rounded-xl flex items-center justify-between gap-3" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+          <div className="min-w-0">
+            <div className="text-xs uppercase tracking-wide mb-1" style={{ color: '#696c80' }}>Signed in as</div>
+            <div className="text-sm truncate" style={{ color: '#f3e9d8' }}>{userEmail}</div>
+          </div>
+          {confirming ? (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={onLogout}
+                className="text-sm font-semibold px-3 py-1.5 rounded-lg btn-raised-sm"
+                style={{ color: '#f6ecd9', background: 'linear-gradient(155deg, #b5652f, #8a3a1e)' }}
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setConfirming(false)}
+                className="text-sm px-3 py-1.5 rounded-lg"
+                style={{ color: '#8d91a8' }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirming(true)}
+              className="text-sm font-medium px-3 py-1.5 rounded-lg shrink-0"
+              style={{ color: '#c9a227', border: '1px solid #c9a22755' }}
+            >
+              Log out
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
+// ---- authentication ----
+function PinInput({ value, onChange, autoFocus }) {
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 4))}
+      inputMode="numeric"
+      pattern="\d*"
+      maxLength={4}
+      autoFocus={autoFocus}
+      placeholder="••••"
+      style={{ ...inputStyle, textAlign: 'center', fontSize: 28, letterSpacing: 10, fontWeight: 600 }}
+    />
+  );
+}
 
+function CodeInput({ value, onChange, autoFocus }) {
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
+      inputMode="numeric"
+      pattern="\d*"
+      maxLength={6}
+      autoFocus={autoFocus}
+      placeholder="••••••"
+      style={{ ...inputStyle, textAlign: 'center', fontSize: 24, letterSpacing: 8, fontWeight: 600 }}
+    />
+  );
+}
+
+function AuthShell({ children }) {
+  return (
+    <div className="min-h-screen w-full relative flex items-center justify-center px-6" style={{ fontFamily: "'Source Sans 3', ui-sans-serif, system-ui" }}>
+      <GlobalStyles />
+      <div className="app-shell min-h-screen w-full absolute inset-0" />
+      <div className="grain" />
+      <div className="w-full max-w-sm relative py-10">
+        <div className="text-center mb-8">
+          <div className="text-xs tracking-[0.2em] uppercase mb-1" style={{ color: '#c9a227' }}>Humidor Journal</div>
+          <div className="font-serif text-2xl" style={{ color: '#f3e9d8' }}>True Herf Cigar Journal</div>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function AuthError({ message }) {
+  if (!message) return null;
+  return (
+    <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: '#3a1f10', color: '#f0c9a3', border: '1px solid #6b3a1a' }}>
+      {message}
+    </div>
+  );
+}
+
+function AuthButton({ children, onClick, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full py-3 rounded-lg font-semibold btn-raised"
+      style={{ background: 'linear-gradient(155deg, #b5652f, #8a4f24)', color: '#f6ecd9', opacity: disabled ? 0.7 : 1 }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function AuthFlow({ deviceId, onAuthenticated }) {
+  // mode: 'gate' | 'login' | 'signup' | 'resetRequest' | 'resetConfirm'
+  const [mode, setMode] = useState('gate');
+  const [email, setEmail] = useState('');
+  const [pin, setPin] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [code, setCode] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
+
+  const reset = (nextMode) => {
+    setMode(nextMode);
+    setError('');
+    setInfo('');
+    setPin('');
+    setPinConfirm('');
+    setCode('');
+    setNewPin('');
+  };
+
+  const handleSignup = async () => {
+    setError('');
+    if (pin.length !== 4) return setError('PIN must be exactly 4 digits.');
+    if (pin !== pinConfirm) return setError('PINs don\u2019t match.');
+    setBusy(true);
+    try {
+      const res = await fetch(SIGNUP_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), pin, deviceId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not create account.');
+      onAuthenticated(data.token, data.email);
+    } catch (e) {
+      setError(e.message || 'Could not create account.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    setError('');
+    if (pin.length !== 4) return setError('Enter your 4-digit PIN.');
+    setBusy(true);
+    try {
+      const res = await fetch(LOGIN_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), pin }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.locked) {
+          setError(data.error);
+          setMode('resetRequest');
+          return;
+        }
+        throw new Error(data.error || 'Could not log in.');
+      }
+      onAuthenticated(data.token, data.email);
+    } catch (e) {
+      setError(e.message || 'Could not log in.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleResetRequest = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      const res = await fetch(RESET_REQUEST_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+      setInfo(data.message || 'If that email has an account, a reset code has been sent.');
+      setMode('resetConfirm');
+    } catch (e) {
+      setError(e.message || 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleResetConfirm = async () => {
+    setError('');
+    if (code.length !== 6) return setError('Enter the 6-digit code from your email.');
+    if (newPin.length !== 4) return setError('New PIN must be exactly 4 digits.');
+    setBusy(true);
+    try {
+      const res = await fetch(RESET_CONFIRM_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), code, newPin }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not reset PIN.');
+      onAuthenticated(data.token, data.email);
+    } catch (e) {
+      setError(e.message || 'Could not reset PIN.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (mode === 'gate') {
+    return (
+      <AuthShell>
+        <p className="text-center text-sm mb-8" style={{ color: '#a6a9bd' }}>
+          Sign in to keep your journal with you across every device.
+        </p>
+        <div className="flex flex-col gap-3">
+          <AuthButton onClick={() => reset('signup')}>Create Account</AuthButton>
+          <button
+            onClick={() => reset('login')}
+            className="w-full py-3 rounded-lg font-semibold"
+            style={{ background: '#131b46', color: '#e8dbc3', border: '1px solid #c9a22755' }}
+          >
+            Log In
+          </button>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  if (mode === 'signup') {
+    return (
+      <AuthShell>
+        <AuthError message={error} />
+        <div className="flex flex-col gap-4 mb-6">
+          <Field label="Email">
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              autoCapitalize="none"
+              placeholder="you@example.com"
+              style={inputStyle}
+            />
+          </Field>
+          <Field label="Choose a 4-digit PIN">
+            <PinInput value={pin} onChange={setPin} />
+          </Field>
+          <Field label="Confirm PIN">
+            <PinInput value={pinConfirm} onChange={setPinConfirm} />
+          </Field>
+        </div>
+        <AuthButton onClick={handleSignup} disabled={busy}>
+          {busy ? 'Creating account…' : 'Create Account'}
+        </AuthButton>
+        <button onClick={() => reset('login')} className="w-full text-center text-sm mt-4" style={{ color: '#c9a227' }}>
+          Already have an account? Log in
+        </button>
+      </AuthShell>
+    );
+  }
+
+  if (mode === 'login') {
+    return (
+      <AuthShell>
+        <AuthError message={error} />
+        <div className="flex flex-col gap-4 mb-6">
+          <Field label="Email">
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              autoCapitalize="none"
+              placeholder="you@example.com"
+              style={inputStyle}
+            />
+          </Field>
+          <Field label="PIN">
+            <PinInput value={pin} onChange={setPin} autoFocus />
+          </Field>
+        </div>
+        <AuthButton onClick={handleLogin} disabled={busy}>
+          {busy ? 'Logging in…' : 'Log In'}
+        </AuthButton>
+        <div className="flex items-center justify-between mt-4">
+          <button onClick={() => reset('signup')} className="text-sm" style={{ color: '#c9a227' }}>
+            Create an account
+          </button>
+          <button onClick={() => reset('resetRequest')} className="text-sm" style={{ color: '#8d91a8' }}>
+            Forgot PIN?
+          </button>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  if (mode === 'resetRequest') {
+    return (
+      <AuthShell>
+        <AuthError message={error} />
+        <p className="text-center text-sm mb-6" style={{ color: '#a6a9bd' }}>
+          Enter your email and we'll send a code to reset your PIN.
+        </p>
+        <div className="mb-6">
+          <Field label="Email">
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              autoCapitalize="none"
+              placeholder="you@example.com"
+              style={inputStyle}
+            />
+          </Field>
+        </div>
+        <AuthButton onClick={handleResetRequest} disabled={busy}>
+          {busy ? 'Sending…' : 'Send Reset Code'}
+        </AuthButton>
+        <button onClick={() => reset('login')} className="w-full text-center text-sm mt-4" style={{ color: '#c9a227' }}>
+          Back to log in
+        </button>
+      </AuthShell>
+    );
+  }
+
+  // resetConfirm
+  return (
+    <AuthShell>
+      <AuthError message={error} />
+      {info && (
+        <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: '#0a0f2e', color: '#a6a9bd', border: '1px solid #131a43' }}>
+          {info}
+        </div>
+      )}
+      <div className="flex flex-col gap-4 mb-6">
+        <Field label="6-digit code">
+          <CodeInput value={code} onChange={setCode} autoFocus />
+        </Field>
+        <Field label="New 4-digit PIN">
+          <PinInput value={newPin} onChange={setNewPin} />
+        </Field>
+      </div>
+      <AuthButton onClick={handleResetConfirm} disabled={busy}>
+        {busy ? 'Resetting…' : 'Reset PIN & Log In'}
+      </AuthButton>
+      <button onClick={() => reset('login')} className="w-full text-center text-sm mt-4" style={{ color: '#c9a227' }}>
+        Back to log in
+      </button>
+    </AuthShell>
+  );
+}
+
+// ---- top-level: gates the app behind authentication ----
+export default function App() {
+  const [auth, setAuth] = useState(() => getStoredAuth());
+  const deviceIdRef = useRef(null);
+  if (deviceIdRef.current === null) deviceIdRef.current = getDeviceId();
+
+  const handleAuthenticated = (token, email) => {
+    storeAuth(token, email);
+    setAuth({ token, email });
+  };
+
+  const handleLogout = () => {
+    clearStoredAuth();
+    setAuth(null);
+  };
+
+  if (!auth) {
+    return <AuthFlow deviceId={deviceIdRef.current} onAuthenticated={handleAuthenticated} />;
+  }
+
+  return <CigarJournal authToken={auth.token} userEmail={auth.email} onLogout={handleLogout} />;
+}
