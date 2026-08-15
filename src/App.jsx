@@ -53,16 +53,16 @@ function getDeviceId() {
 
 // ---- flavor wheel data ----
 const FLAVOR_CATEGORIES = [
-  { key: 'spice', label: 'Spice', color: '#b8502f', flavors: ['Black Pepper', 'Cinnamon', 'Clove', 'Red Pepper'] },
-  { key: 'earth', label: 'Earth', color: '#7a5a3a', flavors: ['Leather', 'Barnyard', 'Damp Earth', 'Mushroom'] },
-  { key: 'wood', label: 'Wood', color: '#a3773f', flavors: ['Cedar', 'Oak', 'Toasted Wood'] },
-  { key: 'nutty', label: 'Nutty', color: '#c98a3f', flavors: ['Almond', 'Hazelnut', 'Roasted Nut'] },
-  { key: 'cream', label: 'Cream', color: '#e6d3a8', flavors: ['Butter', 'Cream', 'Marshmallow'] },
-  { key: 'coffee', label: 'Coffee', color: '#6b4226', flavors: ['Espresso', 'Dark Chocolate', 'Cocoa'] },
-  { key: 'fruit', label: 'Fruit', color: '#b5583f', flavors: ['Dried Fruit', 'Citrus', 'Raisin'] },
-  { key: 'floral', label: 'Floral', color: '#a68bc9', flavors: ['Floral', 'Rose', 'Perfume'] },
-  { key: 'herbal', label: 'Herbal', color: '#7a9a5a', flavors: ['Grass', 'Hay', 'Tea'] },
-  { key: 'sweet', label: 'Sweet', color: '#d9a441', flavors: ['Honey', 'Caramel', 'Vanilla', 'Brown Sugar'] },
+  { key: 'spice', label: 'Spice', color: '#b8502f', flavors: ['Black Pepper', 'Cinnamon', 'Clove', 'White Pepper'] },
+  { key: 'natural', label: 'Natural Flavors', color: '#7a5a3a', flavors: ['Soil', 'Toast', 'Leather', 'Barnyard'] },
+  { key: 'wood', label: 'Wood', color: '#a3773f', flavors: ['Cedar', 'Oak', 'Hickory', 'Mesquite'] },
+  { key: 'nutty', label: 'Nutty', color: '#c98a3f', flavors: ['Almond', 'Walnut', 'Cashew', 'Peanut'] },
+  { key: 'cream', label: 'Cream', color: '#e6d3a8', flavors: ['Malt', 'Nougat', 'Toffee', 'Butter'] },
+  { key: 'coffee', label: 'Coffee', color: '#6b4226', flavors: ['Dark Chocolate', 'Espresso', 'Mocha', 'Cappuccino'] },
+  { key: 'fruit', label: 'Fruit', color: '#b5583f', flavors: ['Dried Fruit', 'Fig', 'Raisin', 'Plum'] },
+  { key: 'floral', label: 'Floral', color: '#a68bc9', flavors: ['Anise', 'Rose', 'Lavender', 'Dried Flowers'] },
+  { key: 'herbal', label: 'Herbal', color: '#7a9a5a', flavors: ['Tea', 'Grass', 'Hay', 'Fresh Herbs'] },
+  { key: 'sweet', label: 'Sweet', color: '#d9a441', flavors: ['Caramel', 'Marshmallow', 'Molasses', 'Milk Chocolate'] },
 ];
 
 
