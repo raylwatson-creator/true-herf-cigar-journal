@@ -348,16 +348,19 @@ function SplashScreen() {
         />
       ))}
       <div className="flex flex-col items-center relative" style={{ zIndex: 2 }}>
-        <div className="splash-band">
-          <span
-            className="font-serif font-semibold"
-            style={{
-              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#5c3a1e', fontSize: 30, letterSpacing: '-0.02em',
-            }}
-          >
-            TH
-          </span>
+        <div className="splash-band-scene">
+          <div className="splash-band">
+            <span
+              className="font-serif font-semibold"
+              style={{
+                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#f7d678', fontSize: 44, letterSpacing: '-0.02em',
+                textShadow: '0 1px 0 rgba(255,238,199,0.35), 0 2px 4px rgba(0,0,0,0.6)',
+              }}
+            >
+              TH
+            </span>
+          </div>
         </div>
         <div className="splash-wordmark">
           <div className="splash-title">True Herf</div>
@@ -476,15 +479,24 @@ function GlobalStyles() {
       background: radial-gradient(circle, rgba(209,112,60,0.9), rgba(209,112,60,0) 70%);
       opacity: 0; animation: emberRise 2.2s ease-out forwards;
     }
+    .splash-band-scene {
+      perspective: 900px; display: flex; align-items: center; justify-content: center;
+    }
     .splash-band {
-      width: 92px; height: 92px; border-radius: 9999px; position: relative;
-      background: radial-gradient(circle at 32% 28%, #f6ecd9, #e7d4ad 55%, #c9a227 100%);
-      box-shadow: 0 6px 24px rgba(0,0,0,0.55), inset 0 0 0 3px #9c7a3c;
-      opacity: 0; transform: scale(0.7);
-      animation: bandPop 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+      width: 140px; height: 140px; border-radius: 9999px; position: relative;
+      background: radial-gradient(circle at 32% 28%, #2a2118, #1c150e 55%, #16110d 100%);
+      box-shadow:
+        0 6px 24px rgba(0,0,0,0.55),
+        inset 0 0 0 6px #9c7a3c,
+        inset 3px 3px 6px rgba(255,244,214,0.5),
+        inset -3px -3px 6px rgba(80,50,15,0.6);
+      opacity: 0; transform: scale(0.7) rotateY(0deg) translateZ(0);
+      transform-style: preserve-3d; backface-visibility: visible;
+      animation: bandLife 3.25s cubic-bezier(0.65, 0, 0.35, 1) forwards;
     }
     .splash-band::after {
-      content: ''; position: absolute; inset: 6px; border-radius: 9999px; border: 1px solid #9c7a3c66;
+      content: ''; position: absolute; inset: 10px; border-radius: 9999px;
+      border: 3px solid #c9a227; border-top-color: #e7d4ad; border-bottom-color: #7a5c22;
     }
     .splash-wordmark {
       margin-top: 22px; text-align: center; opacity: 0; transform: translateY(8px);
@@ -526,10 +538,13 @@ function GlobalStyles() {
       68% { opacity: 1; }
       100% { opacity: 0; visibility: hidden; }
     }
-    @keyframes bandPop {
-      0% { opacity: 0; transform: scale(0.7); }
-      70% { opacity: 1; transform: scale(1.06); }
-      100% { opacity: 1; transform: scale(1); }
+    @keyframes bandLife {
+      0% { opacity: 0; transform: scale(0.7) rotateY(0deg) translateZ(0); }
+      4% { opacity: 0; transform: scale(0.7) rotateY(0deg) translateZ(0); }
+      20% { opacity: 1; transform: scale(1.06) rotateY(0deg) translateZ(0); }
+      26% { opacity: 1; transform: scale(1) rotateY(0deg) translateZ(0); }
+      58% { opacity: 1; transform: scale(1) rotateY(0deg) translateZ(0); }
+      100% { opacity: 0; transform: scale(0.12) rotateY(720deg) translateZ(-420px); }
     }
     @keyframes wordmarkIn {
       to { opacity: 1; transform: translateY(0); }
