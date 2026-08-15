@@ -102,6 +102,11 @@ const fmtDate = (iso) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
+const fmtPrice = (p) => {
+  const clean = String(p || '').replace(/^\$\s*/, '').trim();
+  return clean ? `$${clean}` : '';
+};
+
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -147,39 +152,17 @@ async function generateEntryImage(entry) {
     try { await document.fonts.ready; } catch {}
   }
 
-  const W = 900;
-  const pad = 48;
+  // Fixed 9:16 portrait canvas — a shareable "story" sized card.
+  const W = 1080;
+  const H = 1920;
+  const pad = 56;
+  const contentW = W - pad * 2;
+
   let photoImg = null;
   if (entry.photo) {
     try { photoImg = await loadImage(entry.photo); } catch {}
   }
-  const photoH = photoImg ? 420 : 0;
-
-  const scratch = document.createElement('canvas');
-  const sctx = scratch.getContext('2d');
-  sctx.font = '15px "Source Sans 3", sans-serif';
-  const contentW = W - pad * 2;
-  const thirdsList = [
-    ['First third', entry.thirds?.first, entry.thirdsFlavors?.first],
-    ['Second third', entry.thirds?.second, entry.thirdsFlavors?.second],
-    ['Final third', entry.thirds?.final, entry.thirdsFlavors?.final],
-  ].filter(([, v]) => v);
-
-  let estThirdsH = 0;
-  thirdsList.forEach(([, text, flavors]) => {
-    estThirdsH += 26;
-    const words = text.split(/\s+/);
-    let lines = 1, line = '';
-    words.forEach((w) => {
-      const test = line ? line + ' ' + w : w;
-      if (sctx.measureText(test).width > contentW - 20) { lines++; line = w; } else { line = test; }
-    });
-    estThirdsH += lines * 22 + 18;
-    if (flavors && flavors.length) estThirdsH += 22;
-  });
-
-  const headerH = 210;
-  const H = pad + photoH + (photoImg ? 24 : 0) + headerH + (thirdsList.length ? estThirdsH + 40 : 0) + pad + 60;
+  const photoH = photoImg ? 820 : 0;
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -192,7 +175,7 @@ async function generateEntryImage(entry) {
   bgGrad.addColorStop(1, '#06091a');
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, W, H);
-  const vignette = ctx.createRadialGradient(W / 2, 0, 40, W / 2, 0, W * 0.9);
+  const vignette = ctx.createRadialGradient(W / 2, 0, 60, W / 2, 0, W * 1.1);
   vignette.addColorStop(0, 'rgba(201,162,39,0.10)');
   vignette.addColorStop(1, 'rgba(201,162,39,0)');
   ctx.fillStyle = vignette;
@@ -208,100 +191,156 @@ async function generateEntryImage(entry) {
     roundRectPath(ctx, 0, 0, W, photoH, 0);
     ctx.clip();
     ctx.drawImage(photoImg, (W - dw) / 2, (photoH - dh) / 2, dw, dh);
-    const shade = ctx.createLinearGradient(0, photoH - 90, 0, photoH);
+    const shade = ctx.createLinearGradient(0, photoH - 140, 0, photoH);
     shade.addColorStop(0, 'rgba(6,9,26,0)');
-    shade.addColorStop(1, 'rgba(6,9,26,0.55)');
+    shade.addColorStop(1, 'rgba(6,9,26,0.6)');
     ctx.fillStyle = shade;
-    ctx.fillRect(0, photoH - 90, W, 90);
+    ctx.fillRect(0, photoH - 140, W, 140);
     ctx.restore();
-    y = photoH + 40;
+    y = photoH + 48;
   } else {
-    y = pad;
+    y = pad + 20;
   }
 
   // brand
   ctx.fillStyle = '#f3e9d8';
-  ctx.font = '600 40px Fraunces, serif';
-  ctx.fillText(entry.brand, pad, y + 40);
+  ctx.font = '600 46px Fraunces, serif';
+  ctx.fillText(entry.brand, pad, y + 44);
 
   // name
   if (entry.name) {
     ctx.fillStyle = '#8d91a8';
-    ctx.font = 'italic 20px Fraunces, serif';
-    ctx.fillText(entry.name, pad, y + 72);
+    ctx.font = 'italic 22px Fraunces, serif';
+    ctx.fillText(entry.name, pad, y + 80);
   }
 
   // rating badge
-  const badgeCx = W - pad - 44;
-  const badgeCy = y + 40;
-  const grad = ctx.createRadialGradient(badgeCx - 10, badgeCy - 12, 4, badgeCx, badgeCy, 44);
+  const badgeCx = W - pad - 50;
+  const badgeCy = y + 44;
+  const grad = ctx.createRadialGradient(badgeCx - 12, badgeCy - 14, 4, badgeCx, badgeCy, 50);
   grad.addColorStop(0, '#f6ecd9');
   grad.addColorStop(0.55, '#e7d4ad');
   grad.addColorStop(1, '#c9a227');
   ctx.beginPath();
-  ctx.arc(badgeCx, badgeCy, 44, 0, Math.PI * 2);
+  ctx.arc(badgeCx, badgeCy, 50, 0, Math.PI * 2);
   ctx.fillStyle = grad;
   ctx.fill();
   ctx.lineWidth = 2;
   ctx.strokeStyle = '#9c7a3c';
   ctx.stroke();
   ctx.fillStyle = '#5c3a1e';
-  ctx.font = '600 26px Fraunces, serif';
+  ctx.font = '600 30px Fraunces, serif';
   ctx.textAlign = 'center';
-  ctx.fillText(entry.rating.toFixed(1), badgeCx, badgeCy + 9);
+  ctx.fillText(entry.rating.toFixed(1), badgeCx, badgeCy + 10);
   ctx.textAlign = 'left';
 
-  y += 100;
+  y += 116;
 
-  const metaParts = [entry.vitola, entry.price, entry.pairing, fmtDate(entry.date)].filter(Boolean);
-  ctx.font = '500 15px "Source Sans 3", sans-serif';
+  // meta chips
+  const metaParts = [entry.vitola, fmtPrice(entry.price), entry.pairing, fmtDate(entry.date)].filter(Boolean);
+  ctx.font = '500 16px "Source Sans 3", sans-serif';
   let mx = pad;
   metaParts.forEach((part) => {
     const textW = ctx.measureText(part).width;
-    const chipW = textW + 24;
+    const chipW = textW + 28;
     ctx.fillStyle = '#131b46';
     ctx.strokeStyle = '#1b2455';
-    roundRectPath(ctx, mx, y, chipW, 34, 17);
+    roundRectPath(ctx, mx, y, chipW, 38, 19);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = '#e8dbc3';
-    ctx.fillText(part, mx + 12, y + 22);
-    mx += chipW + 10;
-    if (mx > W - pad - 100) { mx = pad; y += 44; }
+    ctx.fillText(part, mx + 14, y + 25);
+    mx += chipW + 12;
+    if (mx > W - pad - 140) { mx = pad; y += 48; }
   });
-  y += 56;
+  y += 62;
+
+  // thirds — auto-fit to whatever room is left so the card stays a fixed 9:16
+  const thirdsList = [
+    ['First third', entry.thirds?.first, entry.thirdsFlavors?.first],
+    ['Second third', entry.thirds?.second, entry.thirdsFlavors?.second],
+    ['Final third', entry.thirds?.final, entry.thirdsFlavors?.final],
+  ].filter(([, v]) => v);
 
   if (thirdsList.length) {
+    const footerReserve = 76;
+    const availH = Math.max(0, H - y - 40 - footerReserve);
+
+    const measureThirds = (scale) => {
+      const bodyFont = Math.max(11, Math.round(15 * scale));
+      ctx.font = `${bodyFont}px "Source Sans 3", sans-serif`;
+      let h = 0;
+      thirdsList.forEach(([, text, flavors]) => {
+        h += 30 * scale;
+        const words = text.split(/\s+/);
+        let lines = 1, line = '';
+        words.forEach((w) => {
+          const test = line ? line + ' ' + w : w;
+          if (ctx.measureText(test).width > contentW - 24) { lines++; line = w; } else { line = test; }
+        });
+        h += lines * 26 * scale;
+        if (flavors && flavors.length) h += 24 * scale;
+        h += 20 * scale;
+      });
+      return h;
+    };
+
+    let fitScale = 1;
+    if (measureThirds(1) > availH) {
+      let lo = 0.55, hi = 1;
+      for (let i = 0; i < 8; i++) {
+        const mid = (lo + hi) / 2;
+        if (measureThirds(mid) > availH) hi = mid; else lo = mid;
+      }
+      fitScale = lo;
+    }
+
+    const labelFont = Math.max(13, Math.round(19 * fitScale));
+    const bodyFont = Math.max(11, Math.round(15 * fitScale));
+    const flavorFont = Math.max(10, Math.round(13 * fitScale));
+    const labelGap = 30 * fitScale;
+    const lineH = 26 * fitScale;
+    const flavorGap = 24 * fitScale;
+    const thirdGap = 20 * fitScale;
+
     ctx.strokeStyle = '#1b2455';
     ctx.beginPath();
     ctx.moveTo(pad, y);
     ctx.lineTo(W - pad, y);
     ctx.stroke();
-    y += 34;
+    y += 40;
+
+    // hard clip as a safety net in case notes are extremely long even at the smallest scale
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, y - 20, W, availH + 20);
+    ctx.clip();
 
     thirdsList.forEach(([label, text, flavors]) => {
       ctx.fillStyle = '#c9a227';
-      ctx.fillRect(pad, y - 16, 4, 20);
+      ctx.fillRect(pad, y - Math.round(18 * fitScale), 4, Math.round(22 * fitScale));
       ctx.fillStyle = '#e8dbc3';
-      ctx.font = '600 17px "Source Sans 3", sans-serif';
-      ctx.fillText(label, pad + 16, y);
-      y += 26;
+      ctx.font = `600 ${labelFont}px "Source Sans 3", sans-serif`;
+      ctx.fillText(label, pad + 18, y);
+      y += labelGap;
       ctx.fillStyle = '#a6a9bd';
-      ctx.font = '15px "Source Sans 3", sans-serif';
-      y = wrapText(ctx, text, pad + 16, y, contentW - 20, 22);
+      ctx.font = `${bodyFont}px "Source Sans 3", sans-serif`;
+      y = wrapText(ctx, text, pad + 18, y, contentW - 24, lineH);
       if (flavors && flavors.length) {
         ctx.fillStyle = '#c9a227';
-        ctx.font = 'italic 13px Fraunces, serif';
-        ctx.fillText(flavors.join('  ·  '), pad + 16, y);
-        y += 22;
+        ctx.font = `italic ${flavorFont}px Fraunces, serif`;
+        ctx.fillText(flavors.join('  ·  '), pad + 18, y);
+        y += flavorGap;
       }
-      y += 18;
+      y += thirdGap;
     });
+
+    ctx.restore();
   }
 
   ctx.fillStyle = '#696c80';
-  ctx.font = 'italic 13px Fraunces, serif';
-  ctx.fillText('True Herf Cigar Journal', pad, H - 24);
+  ctx.font = 'italic 15px Fraunces, serif';
+  ctx.fillText('True Herf Cigar Journal', pad, H - 28);
 
   return canvas.toDataURL('image/png');
 }
@@ -944,7 +983,7 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
   const [wrapper, setWrapper] = useState(initialEntry?.wrapper || '');
   const [binder, setBinder] = useState(initialEntry?.binder || '');
   const [filler, setFiller] = useState(initialEntry?.filler || '');
-  const [price, setPrice] = useState(initialEntry?.price || '');
+  const [price, setPrice] = useState((initialEntry?.price || '').replace(/^\$\s*/, ''));
   const [pairing, setPairing] = useState(initialEntry?.pairing || '');
   const [rating, setRating] = useState(initialEntry?.rating ?? 3);
   const [date, setDate] = useState(() => initialEntry?.date || new Date().toISOString().slice(0, 10));
@@ -1083,7 +1122,29 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
         <input value={filler} onChange={(e) => setFiller(e.target.value)} placeholder="e.g. Nicaraguan, Dominican" style={inputStyle} />
       </Field>
       <Field label="Price">
-        <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. $14" style={inputStyle} />
+        <div style={{ position: 'relative' }}>
+          <span
+            style={{
+              position: 'absolute',
+              left: 12,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: '#6b5b3a',
+              fontSize: 14,
+              fontWeight: 600,
+              pointerEvents: 'none',
+            }}
+          >
+            $
+          </span>
+          <input
+            value={price}
+            onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+            inputMode="decimal"
+            placeholder="14.00"
+            style={{ ...inputStyle, paddingLeft: 22 }}
+          />
+        </div>
       </Field>
       <Field label="Pairing">
         <input value={pairing} onChange={(e) => setPairing(e.target.value)} placeholder="e.g. Bourbon, espresso" style={inputStyle} />
@@ -1348,7 +1409,7 @@ function DetailView({ entry, onDelete, onEdit }) {
         {entry.wrapper && <InfoChip label="Wrapper" value={entry.wrapper} />}
         {entry.binder && <InfoChip label="Binder" value={entry.binder} />}
         {entry.filler && <InfoChip label="Filler" value={entry.filler} />}
-        {entry.price && <InfoChip label="Price" value={entry.price} />}
+        {entry.price && <InfoChip label="Price" value={fmtPrice(entry.price)} />}
         {entry.pairing && <InfoChip label="Pairing" value={entry.pairing} />}
       </div>
 
