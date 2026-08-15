@@ -316,18 +316,18 @@ function SplashScreen() {
     { left: '60%', delay: '0.4s', size: 3 },
   ];
   const wisps = [
-    { left: '20%', size: 90, delay: '1.45s', drift: '-40px' },
-    { left: '35%', size: 120, delay: '1.5s', drift: '-16px' },
-    { left: '48%', size: 150, delay: '1.55s', drift: '10px' },
-    { left: '58%', size: 110, delay: '1.6s', drift: '30px' },
-    { left: '70%', size: 95, delay: '1.65s', drift: '48px' },
-    { left: '28%', size: 130, delay: '1.7s', drift: '-30px' },
-    { left: '52%', size: 160, delay: '1.75s', drift: '4px' },
-    { left: '63%', size: 100, delay: '1.85s', drift: '38px' },
-    { left: '40%', size: 140, delay: '1.9s', drift: '-22px' },
-    { left: '18%', size: 105, delay: '1.95s', drift: '-52px' },
-    { left: '75%', size: 90, delay: '2.0s', drift: '58px' },
-    { left: '46%', size: 170, delay: '2.05s', drift: '0px' },
+    { left: '20%', size: 90, delay: '1.8s', drift: '-40px' },
+    { left: '35%', size: 120, delay: '1.9s', drift: '-16px' },
+    { left: '48%', size: 150, delay: '1.95s', drift: '10px' },
+    { left: '58%', size: 110, delay: '2.0s', drift: '30px' },
+    { left: '70%', size: 95, delay: '2.05s', drift: '48px' },
+    { left: '28%', size: 130, delay: '2.1s', drift: '-30px' },
+    { left: '52%', size: 160, delay: '2.2s', drift: '4px' },
+    { left: '63%', size: 100, delay: '2.3s', drift: '38px' },
+    { left: '40%', size: 140, delay: '2.4s', drift: '-22px' },
+    { left: '18%', size: 105, delay: '2.45s', drift: '-52px' },
+    { left: '75%', size: 90, delay: '2.5s', drift: '58px' },
+    { left: '46%', size: 170, delay: '2.55s', drift: '0px' },
   ];
   return (
     <div className="splash-screen">
@@ -469,7 +469,7 @@ function GlobalStyles() {
       background-size: auto, cover;
       background-position: center, center 38%;
       background-repeat: no-repeat, no-repeat;
-      animation: splashFade 2.6s ease forwards;
+      animation: splashFade 3.25s ease forwards;
     }
     .splash-ember {
       position: absolute; border-radius: 9999px; pointer-events: none; z-index: 3;
@@ -509,8 +509,8 @@ function GlobalStyles() {
       mix-blend-mode: screen;
       filter: blur(4px);
       opacity: 0;
-      animation: smokeSheetRoll 1.5s ease-in forwards;
-      animation-delay: 1.45s;
+      animation: smokeSheetRoll 1.9s ease-in forwards;
+      animation-delay: 1.8s;
     }
     .smoke-wisp {
       position: absolute; bottom: 45%; pointer-events: none; z-index: 3;
@@ -519,7 +519,7 @@ function GlobalStyles() {
       mix-blend-mode: screen;
       filter: blur(2px);
       opacity: 0;
-      animation: smokeRise 2s ease-out forwards;
+      animation: smokeRise 2.5s ease-out forwards;
     }
     @keyframes splashFade {
       0% { opacity: 1; }
@@ -613,7 +613,7 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
   };
 
   useEffect(() => {
-    const t = setTimeout(() => setShowSplash(false), 2600);
+    const t = setTimeout(() => setShowSplash(false), 3250);
     return () => clearTimeout(t);
   }, []);
 
