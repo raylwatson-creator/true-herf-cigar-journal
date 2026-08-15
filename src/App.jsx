@@ -775,8 +775,8 @@ function Header({ view, setView, onBack }) {
     <div className="px-5 pt-6 pb-4 flex items-center justify-between" style={{ borderBottom: '1px solid #131a43' }}>
       <div className="flex items-center gap-2">
         {view !== 'list' && (
-          <button onClick={onBack} className="p-1.5 -ml-1 rounded-full btn-raised-sm" style={{ color: '#c9a227', background: '#131b46' }}>
-            <ChevronLeft size={22} />
+          <button onClick={onBack} className="p-2.5 -ml-1 rounded-full btn-raised-sm" style={{ color: '#c9a227', background: '#131b46' }}>
+            <ChevronLeft size={24} />
           </button>
         )}
         <div>
@@ -794,24 +794,24 @@ function Header({ view, setView, onBack }) {
         <div className="flex gap-2">
           <button
             onClick={() => setView('list')}
-            className={`px-3 py-1.5 rounded-full flex items-center gap-1 btn-raised-sm ${view === 'list' ? 'btn-pressed-sm' : ''}`}
+            className={`px-4 py-2.5 rounded-full flex items-center gap-1 btn-raised-sm ${view === 'list' ? 'btn-pressed-sm' : ''}`}
             style={{ background: view === 'list' ? '#e8dbc3' : '#131b46', color: view === 'list' ? '#0a0f2e' : '#c9a227', border: '1px solid #c9a22755' }}
           >
-            <BookOpen size={15} />
+            <BookOpen size={20} />
           </button>
           <button
             onClick={() => setView('stats')}
-            className={`px-3 py-1.5 rounded-full flex items-center gap-1 btn-raised-sm ${view === 'stats' ? 'btn-pressed-sm' : ''}`}
+            className={`px-4 py-2.5 rounded-full flex items-center gap-1 btn-raised-sm ${view === 'stats' ? 'btn-pressed-sm' : ''}`}
             style={{ background: view === 'stats' ? '#e8dbc3' : '#131b46', color: view === 'stats' ? '#0a0f2e' : '#c9a227', border: '1px solid #c9a22755' }}
           >
-            <BarChart2 size={15} />
+            <BarChart2 size={20} />
           </button>
           <button
             onClick={() => setView('guide')}
-            className={`px-3 py-1.5 rounded-full flex items-center gap-1 btn-raised-sm ${view === 'guide' ? 'btn-pressed-sm' : ''}`}
+            className={`px-4 py-2.5 rounded-full flex items-center gap-1 btn-raised-sm ${view === 'guide' ? 'btn-pressed-sm' : ''}`}
             style={{ background: view === 'guide' ? '#e8dbc3' : '#131b46', color: view === 'guide' ? '#0a0f2e' : '#c9a227', border: '1px solid #c9a22755' }}
           >
-            <Ruler size={15} />
+            <Ruler size={20} />
           </button>
         </div>
       )}
