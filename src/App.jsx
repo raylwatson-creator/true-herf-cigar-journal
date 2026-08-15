@@ -1539,11 +1539,27 @@ function GuideView({ userEmail, onLogout }) {
         <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>
           Cigar Vitolas
         </div>
-        <div className="p-3 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+        <div className="-mx-5 rounded-xl overflow-hidden" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
           <img
             src={VITOLA_DIAGRAM_IMG}
             alt="Guide to common cigar vitolas"
-            className="w-full rounded-lg"
+            className="w-full"
+          />
+        </div>
+      </div>
+
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#c9a227' }}>
+          Wrapper Guide
+        </div>
+        <div className="text-sm mb-3" style={{ color: '#696c80' }}>
+          From lightest to darkest — how the wrapper shapes the smoke.
+        </div>
+        <div className="-mx-5 rounded-xl overflow-hidden" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+          <img
+            src="/wrapper_guide.jpg"
+            alt="Cigar wrapper classification guide, from Double Claro to Oscuro"
+            className="w-full"
           />
         </div>
       </div>
