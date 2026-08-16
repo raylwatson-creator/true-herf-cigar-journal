@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, Search, Camera, ChevronLeft, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil } from 'lucide-react';
+import { Plus, Search, Camera, ChevronLeft, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star } from 'lucide-react';
 
 const ENTRIES_API = '/.netlify/functions/entries';
 const DEVICE_ID_KEY = 'cigar-device-id';
@@ -436,24 +436,6 @@ function CigarBand({ rating, size = 56 }) {
   );
 }
 
-function SmokeWisp({ size = 16, fill = 'none', stroke = '#3c4576', strokeWidth = 1.5 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M13.5 2.2
-        C15.2 3.6 11.6 5.3 12.8 7.1
-        C14 8.9 17 7.6 17.3 10
-        C17.6 12.4 12.2 12 11.8 14.6
-        C11.5 16.6 15.2 16.4 14.8 19
-        C14.4 21.4 10.5 22 8.3 20.3
-        C6.4 18.8 7.6 16.4 9.8 16.2
-        C7.6 15.6 6.2 13.4 7.6 11.4
-        C8.8 9.7 11.4 10.4 11.1 8.2
-        C10.9 6.5 8.6 6.3 9.2 4.3
-        C9.7 2.7 12.2 1.3 13.5 2.2 Z" />
-    </svg>
-  );
-}
-
 function Stars({ value, onChange, size = 22 }) {
   return (
     <div className="flex gap-1.5">
@@ -465,10 +447,10 @@ function Stars({ value, onChange, size = 22 }) {
           className={`w-8 h-8 rounded-full flex items-center justify-center btn-raised-sm ${n <= value ? 'btn-pressed-sm' : ''} ${onChange ? 'cursor-pointer' : 'cursor-default'}`}
           style={{ background: n <= value ? '#e8dbc3' : '#0a0f2e' }}
         >
-          <SmokeWisp
+          <Star
             size={size * 0.7}
-            fill={n <= value ? '#0a0f2e' : 'none'}
-            stroke={n <= value ? '#0a0f2e' : '#3c4576'}
+            fill={n <= value ? '#c9a227' : 'none'}
+            stroke={n <= value ? '#c9a227' : '#3c4576'}
             strokeWidth={1.5}
           />
         </button>
@@ -1344,7 +1326,7 @@ function ThirdField({ label, hint, value, onChange }) {
   return (
     <div className="pl-3" style={{ borderLeft: '2px solid #c9a227' }}>
       <div className="text-sm font-medium mb-0.5" style={{ color: '#e8dbc3' }}>{label}</div>
-      <div className="text-xs mb-1.5" style={{ color: '#696c80' }}>{hint}</div>
+      <div className="text-sm mb-1.5" style={{ color: 'rgba(255,255,255,0.75)' }}>{hint}</div>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
