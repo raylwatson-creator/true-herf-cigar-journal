@@ -204,56 +204,56 @@ async function generateEntryImage(entry) {
 
   // brand
   ctx.fillStyle = '#f3e9d8';
-  ctx.font = '600 46px Fraunces, serif';
-  ctx.fillText(entry.brand, pad, y + 44);
+  ctx.font = '600 54px Fraunces, serif';
+  ctx.fillText(entry.brand, pad, y + 52);
 
   // name
   if (entry.name) {
-    ctx.fillStyle = '#8d91a8';
-    ctx.font = 'italic 22px Fraunces, serif';
-    ctx.fillText(entry.name, pad, y + 80);
+    ctx.fillStyle = '#a6a9bd';
+    ctx.font = 'italic 26px Fraunces, serif';
+    ctx.fillText(entry.name, pad, y + 95);
   }
 
   // rating badge
-  const badgeCx = W - pad - 50;
-  const badgeCy = y + 44;
-  const grad = ctx.createRadialGradient(badgeCx - 12, badgeCy - 14, 4, badgeCx, badgeCy, 50);
+  const badgeCx = W - pad - 56;
+  const badgeCy = y + 52;
+  const grad = ctx.createRadialGradient(badgeCx - 13, badgeCy - 15, 4, badgeCx, badgeCy, 56);
   grad.addColorStop(0, '#f6ecd9');
   grad.addColorStop(0.55, '#e7d4ad');
   grad.addColorStop(1, '#c9a227');
   ctx.beginPath();
-  ctx.arc(badgeCx, badgeCy, 50, 0, Math.PI * 2);
+  ctx.arc(badgeCx, badgeCy, 56, 0, Math.PI * 2);
   ctx.fillStyle = grad;
   ctx.fill();
   ctx.lineWidth = 2;
   ctx.strokeStyle = '#9c7a3c';
   ctx.stroke();
   ctx.fillStyle = '#5c3a1e';
-  ctx.font = '600 30px Fraunces, serif';
+  ctx.font = '600 34px Fraunces, serif';
   ctx.textAlign = 'center';
-  ctx.fillText(entry.rating.toFixed(1), badgeCx, badgeCy + 10);
+  ctx.fillText(entry.rating.toFixed(1), badgeCx, badgeCy + 12);
   ctx.textAlign = 'left';
 
-  y += 116;
+  y += 132;
 
   // meta chips
   const metaParts = [entry.vitola, fmtPrice(entry.price), entry.pairing, fmtDate(entry.date)].filter(Boolean);
-  ctx.font = '500 16px "Source Sans 3", sans-serif';
+  ctx.font = '500 19px "Source Sans 3", sans-serif';
   let mx = pad;
   metaParts.forEach((part) => {
     const textW = ctx.measureText(part).width;
-    const chipW = textW + 28;
+    const chipW = textW + 34;
     ctx.fillStyle = '#131b46';
     ctx.strokeStyle = '#1b2455';
-    roundRectPath(ctx, mx, y, chipW, 38, 19);
+    roundRectPath(ctx, mx, y, chipW, 44, 22);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#e8dbc3';
-    ctx.fillText(part, mx + 14, y + 25);
-    mx += chipW + 12;
-    if (mx > W - pad - 140) { mx = pad; y += 48; }
+    ctx.fillStyle = '#f3e9d8';
+    ctx.fillText(part, mx + 16, y + 29);
+    mx += chipW + 14;
+    if (mx > W - pad - 150) { mx = pad; y += 54; }
   });
-  y += 62;
+  y += 70;
 
   // thirds — auto-fit to whatever room is left so the card stays a fixed 9:16
   const thirdsList = [
@@ -263,31 +263,31 @@ async function generateEntryImage(entry) {
   ].filter(([, v]) => v);
 
   if (thirdsList.length) {
-    const footerReserve = 76;
-    const availH = Math.max(0, H - y - 40 - footerReserve);
+    const footerReserve = 80;
+    const availH = Math.max(0, H - y - 46 - footerReserve);
 
     const measureThirds = (scale) => {
-      const bodyFont = Math.max(11, Math.round(15 * scale));
+      const bodyFont = Math.max(14, Math.round(18 * scale));
       ctx.font = `${bodyFont}px "Source Sans 3", sans-serif`;
       let h = 0;
       thirdsList.forEach(([, text, flavors]) => {
-        h += 30 * scale;
+        h += 36 * scale;
         const words = text.split(/\s+/);
         let lines = 1, line = '';
         words.forEach((w) => {
           const test = line ? line + ' ' + w : w;
-          if (ctx.measureText(test).width > contentW - 24) { lines++; line = w; } else { line = test; }
+          if (ctx.measureText(test).width > contentW - 28) { lines++; line = w; } else { line = test; }
         });
-        h += lines * 26 * scale;
-        if (flavors && flavors.length) h += 24 * scale;
-        h += 20 * scale;
+        h += lines * 31 * scale;
+        if (flavors && flavors.length) h += 28 * scale;
+        h += 24 * scale;
       });
       return h;
     };
 
     let fitScale = 1;
     if (measureThirds(1) > availH) {
-      let lo = 0.55, hi = 1;
+      let lo = 0.65, hi = 1;
       for (let i = 0; i < 8; i++) {
         const mid = (lo + hi) / 2;
         if (measureThirds(mid) > availH) hi = mid; else lo = mid;
@@ -295,41 +295,41 @@ async function generateEntryImage(entry) {
       fitScale = lo;
     }
 
-    const labelFont = Math.max(13, Math.round(19 * fitScale));
-    const bodyFont = Math.max(11, Math.round(15 * fitScale));
-    const flavorFont = Math.max(10, Math.round(13 * fitScale));
-    const labelGap = 30 * fitScale;
-    const lineH = 26 * fitScale;
-    const flavorGap = 24 * fitScale;
-    const thirdGap = 20 * fitScale;
+    const labelFont = Math.max(16, Math.round(23 * fitScale));
+    const bodyFont = Math.max(14, Math.round(18 * fitScale));
+    const flavorFont = Math.max(12, Math.round(16 * fitScale));
+    const labelGap = 36 * fitScale;
+    const lineH = 31 * fitScale;
+    const flavorGap = 28 * fitScale;
+    const thirdGap = 24 * fitScale;
 
     ctx.strokeStyle = '#1b2455';
     ctx.beginPath();
     ctx.moveTo(pad, y);
     ctx.lineTo(W - pad, y);
     ctx.stroke();
-    y += 40;
+    y += 46;
 
     // hard clip as a safety net in case notes are extremely long even at the smallest scale
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, y - 20, W, availH + 20);
+    ctx.rect(0, y - 22, W, availH + 22);
     ctx.clip();
 
     thirdsList.forEach(([label, text, flavors]) => {
       ctx.fillStyle = '#c9a227';
-      ctx.fillRect(pad, y - Math.round(18 * fitScale), 4, Math.round(22 * fitScale));
-      ctx.fillStyle = '#e8dbc3';
+      ctx.fillRect(pad, y - Math.round(21 * fitScale), 5, Math.round(26 * fitScale));
+      ctx.fillStyle = '#f3e9d8';
       ctx.font = `600 ${labelFont}px "Source Sans 3", sans-serif`;
-      ctx.fillText(label, pad + 18, y);
+      ctx.fillText(label, pad + 20, y);
       y += labelGap;
-      ctx.fillStyle = '#a6a9bd';
+      ctx.fillStyle = '#c7cadb';
       ctx.font = `${bodyFont}px "Source Sans 3", sans-serif`;
-      y = wrapText(ctx, text, pad + 18, y, contentW - 24, lineH);
+      y = wrapText(ctx, text, pad + 20, y, contentW - 28, lineH);
       if (flavors && flavors.length) {
         ctx.fillStyle = '#c9a227';
         ctx.font = `italic ${flavorFont}px Fraunces, serif`;
-        ctx.fillText(flavors.join('  ·  '), pad + 18, y);
+        ctx.fillText(flavors.join('  ·  '), pad + 20, y);
         y += flavorGap;
       }
       y += thirdGap;
@@ -338,9 +338,9 @@ async function generateEntryImage(entry) {
     ctx.restore();
   }
 
-  ctx.fillStyle = '#696c80';
-  ctx.font = 'italic 15px Fraunces, serif';
-  ctx.fillText('True Herf Cigar Journal', pad, H - 28);
+  ctx.fillStyle = '#8d91a8';
+  ctx.font = 'italic 17px Fraunces, serif';
+  ctx.fillText('True Herf Cigar Journal', pad, H - 30);
 
   return canvas.toDataURL('image/png');
 }
