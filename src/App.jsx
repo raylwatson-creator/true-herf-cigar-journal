@@ -137,6 +137,19 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   return curY;
 }
 
+function fitTextToWidth(ctx, text, weightPrefix, baseSize, minSize, maxWidth, fontSuffix) {
+  ctx.font = `${weightPrefix}${baseSize}px ${fontSuffix}`;
+  let w = ctx.measureText(text).width;
+  if (w <= maxWidth) return { size: baseSize, text };
+  let size = Math.max(minSize, Math.floor(baseSize * (maxWidth / w)));
+  ctx.font = `${weightPrefix}${size}px ${fontSuffix}`;
+  w = ctx.measureText(text).width;
+  if (w <= maxWidth) return { size, text };
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxWidth) t = t.slice(0, -1);
+  return { size, text: t.length < text.length ? t + '…' : text };
+}
+
 function roundRectPath(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -157,17 +170,66 @@ async function generateEntryImage(entry) {
   const H = 1920;
   const pad = 56;
   const contentW = W - pad * 2;
+  const maxPhotoH = 820;
+  const minPhotoH = 460;
 
   let photoImg = null;
   if (entry.photo) {
     try { photoImg = await loadImage(entry.photo); } catch {}
   }
-  const photoH = photoImg ? 820 : 0;
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d');
+
+  // thirds — auto-fit to whatever room is left so the card stays a fixed 9:16
+  const thirdsList = [
+    ['First third', entry.thirds?.first, entry.thirdsFlavors?.first],
+    ['Second third', entry.thirds?.second, entry.thirdsFlavors?.second],
+    ['Final third', entry.thirds?.final, entry.thirdsFlavors?.final],
+  ].filter(([, v]) => v);
+
+  const measureThirds = (scale) => {
+    const bodyFont = Math.max(22, Math.round(36 * scale));
+    ctx.font = `${bodyFont}px "Source Sans 3", sans-serif`;
+    let h = 0;
+    thirdsList.forEach(([, text, flavors]) => {
+      h += 72 * scale;
+      const words = text.split(/\s+/);
+      let lines = 1, line = '';
+      words.forEach((w) => {
+        const test = line ? line + ' ' + w : w;
+        if (ctx.measureText(test).width > contentW - 56) { lines++; line = w; } else { line = test; }
+      });
+      h += lines * 62 * scale;
+      if (flavors && flavors.length) h += 56 * scale;
+      h += 48 * scale;
+    });
+    return h;
+  };
+
+  // meta chips — measured now (dry run) so we know how much vertical room they'll need
+  const metaParts = [entry.vitola, fmtPrice(entry.price), entry.pairing, fmtDate(entry.date)].filter(Boolean);
+  ctx.font = '500 38px "Source Sans 3", sans-serif';
+  let metaExtraRowsH = 0;
+  {
+    let dryMx = pad;
+    metaParts.forEach((part) => {
+      const chipW = ctx.measureText(part).width + 68;
+      dryMx += chipW + 28;
+      if (dryMx > W - pad - 300) { dryMx = pad; metaExtraRowsH += 108; }
+    });
+  }
+
+  // reclaim photo height for long notes so the card never overflows/clips
+  let photoH = photoImg ? maxPhotoH : 0;
+  if (photoImg && thirdsList.length) {
+    const neededFull = measureThirds(1);
+    const fixedNonPhotoH = 48 + 264 + metaExtraRowsH + 140 + 92 + 160;
+    const idealPhotoH = H - fixedNonPhotoH - neededFull;
+    photoH = Math.max(minPhotoH, Math.min(maxPhotoH, idealPhotoH));
+  }
 
   // background — deep tobacco leather with soft vignette
   const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
@@ -202,134 +264,111 @@ async function generateEntryImage(entry) {
     y = pad + 20;
   }
 
-  // brand
+  const badgeSafeMaxW = contentW - 244;
+
+  // brand — auto-shrinks (and truncates as a last resort) so it never runs behind the rating badge
   ctx.fillStyle = '#f3e9d8';
-  ctx.font = '600 54px Fraunces, serif';
-  ctx.fillText(entry.brand, pad, y + 52);
+  const brandFit = fitTextToWidth(ctx, entry.brand, '600 ', 108, 44, badgeSafeMaxW, 'Fraunces, serif');
+  ctx.font = `600 ${brandFit.size}px Fraunces, serif`;
+  ctx.fillText(brandFit.text, pad, y + 104);
 
   // name
   if (entry.name) {
     ctx.fillStyle = '#a6a9bd';
-    ctx.font = 'italic 26px Fraunces, serif';
-    ctx.fillText(entry.name, pad, y + 95);
+    const nameFit = fitTextToWidth(ctx, entry.name, 'italic ', 52, 24, badgeSafeMaxW, 'Fraunces, serif');
+    ctx.font = `italic ${nameFit.size}px Fraunces, serif`;
+    ctx.fillText(nameFit.text, pad, y + 190);
   }
 
   // rating badge
-  const badgeCx = W - pad - 56;
-  const badgeCy = y + 52;
-  const grad = ctx.createRadialGradient(badgeCx - 13, badgeCy - 15, 4, badgeCx, badgeCy, 56);
+  const badgeCx = W - pad - 112;
+  const badgeCy = y + 104;
+  const grad = ctx.createRadialGradient(badgeCx - 26, badgeCy - 30, 8, badgeCx, badgeCy, 112);
   grad.addColorStop(0, '#f6ecd9');
   grad.addColorStop(0.55, '#e7d4ad');
   grad.addColorStop(1, '#c9a227');
   ctx.beginPath();
-  ctx.arc(badgeCx, badgeCy, 56, 0, Math.PI * 2);
+  ctx.arc(badgeCx, badgeCy, 112, 0, Math.PI * 2);
   ctx.fillStyle = grad;
   ctx.fill();
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 4;
   ctx.strokeStyle = '#9c7a3c';
   ctx.stroke();
   ctx.fillStyle = '#5c3a1e';
-  ctx.font = '600 34px Fraunces, serif';
+  ctx.font = '600 68px Fraunces, serif';
   ctx.textAlign = 'center';
-  ctx.fillText(entry.rating.toFixed(1), badgeCx, badgeCy + 12);
+  ctx.fillText(entry.rating.toFixed(1), badgeCx, badgeCy + 24);
   ctx.textAlign = 'left';
 
-  y += 132;
+  y += 264;
 
-  // meta chips
-  const metaParts = [entry.vitola, fmtPrice(entry.price), entry.pairing, fmtDate(entry.date)].filter(Boolean);
-  ctx.font = '500 19px "Source Sans 3", sans-serif';
+  // meta chips (actual drawing)
+  ctx.font = '500 38px "Source Sans 3", sans-serif';
   let mx = pad;
   metaParts.forEach((part) => {
     const textW = ctx.measureText(part).width;
-    const chipW = textW + 34;
+    const chipW = textW + 68;
     ctx.fillStyle = '#131b46';
     ctx.strokeStyle = '#1b2455';
-    roundRectPath(ctx, mx, y, chipW, 44, 22);
+    roundRectPath(ctx, mx, y, chipW, 88, 44);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = '#f3e9d8';
-    ctx.fillText(part, mx + 16, y + 29);
-    mx += chipW + 14;
-    if (mx > W - pad - 150) { mx = pad; y += 54; }
+    ctx.fillText(part, mx + 32, y + 58);
+    mx += chipW + 28;
+    if (mx > W - pad - 300) { mx = pad; y += 108; }
   });
-  y += 70;
-
-  // thirds — auto-fit to whatever room is left so the card stays a fixed 9:16
-  const thirdsList = [
-    ['First third', entry.thirds?.first, entry.thirdsFlavors?.first],
-    ['Second third', entry.thirds?.second, entry.thirdsFlavors?.second],
-    ['Final third', entry.thirds?.final, entry.thirdsFlavors?.final],
-  ].filter(([, v]) => v);
+  y += 140;
 
   if (thirdsList.length) {
-    const footerReserve = 80;
-    const availH = Math.max(0, H - y - 46 - footerReserve);
-
-    const measureThirds = (scale) => {
-      const bodyFont = Math.max(14, Math.round(18 * scale));
-      ctx.font = `${bodyFont}px "Source Sans 3", sans-serif`;
-      let h = 0;
-      thirdsList.forEach(([, text, flavors]) => {
-        h += 36 * scale;
-        const words = text.split(/\s+/);
-        let lines = 1, line = '';
-        words.forEach((w) => {
-          const test = line ? line + ' ' + w : w;
-          if (ctx.measureText(test).width > contentW - 28) { lines++; line = w; } else { line = test; }
-        });
-        h += lines * 31 * scale;
-        if (flavors && flavors.length) h += 28 * scale;
-        h += 24 * scale;
-      });
-      return h;
-    };
+    const footerReserve = 160;
+    const availH = Math.max(0, H - y - 92 - footerReserve);
 
     let fitScale = 1;
     if (measureThirds(1) > availH) {
-      let lo = 0.65, hi = 1;
-      for (let i = 0; i < 8; i++) {
+      let lo = 0.5, hi = 1;
+      for (let i = 0; i < 10; i++) {
         const mid = (lo + hi) / 2;
         if (measureThirds(mid) > availH) hi = mid; else lo = mid;
       }
       fitScale = lo;
     }
 
-    const labelFont = Math.max(16, Math.round(23 * fitScale));
-    const bodyFont = Math.max(14, Math.round(18 * fitScale));
-    const flavorFont = Math.max(12, Math.round(16 * fitScale));
-    const labelGap = 36 * fitScale;
-    const lineH = 31 * fitScale;
-    const flavorGap = 28 * fitScale;
-    const thirdGap = 24 * fitScale;
+    const labelFont = Math.max(26, Math.round(46 * fitScale));
+    const bodyFont = Math.max(22, Math.round(36 * fitScale));
+    const flavorFont = Math.max(20, Math.round(32 * fitScale));
+    const labelGap = 72 * fitScale;
+    const lineH = 62 * fitScale;
+    const flavorGap = 56 * fitScale;
+    const thirdGap = 48 * fitScale;
 
     ctx.strokeStyle = '#1b2455';
     ctx.beginPath();
     ctx.moveTo(pad, y);
     ctx.lineTo(W - pad, y);
     ctx.stroke();
-    y += 46;
+    y += 92;
 
     // hard clip as a safety net in case notes are extremely long even at the smallest scale
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, y - 22, W, availH + 22);
+    ctx.rect(0, y - 44, W, availH + 44);
     ctx.clip();
 
     thirdsList.forEach(([label, text, flavors]) => {
       ctx.fillStyle = '#c9a227';
-      ctx.fillRect(pad, y - Math.round(21 * fitScale), 5, Math.round(26 * fitScale));
+      ctx.fillRect(pad, y - Math.round(42 * fitScale), 10, Math.round(52 * fitScale));
       ctx.fillStyle = '#f3e9d8';
       ctx.font = `600 ${labelFont}px "Source Sans 3", sans-serif`;
-      ctx.fillText(label, pad + 20, y);
+      ctx.fillText(label, pad + 40, y);
       y += labelGap;
       ctx.fillStyle = '#c7cadb';
       ctx.font = `${bodyFont}px "Source Sans 3", sans-serif`;
-      y = wrapText(ctx, text, pad + 20, y, contentW - 28, lineH);
+      y = wrapText(ctx, text, pad + 40, y, contentW - 56, lineH);
       if (flavors && flavors.length) {
         ctx.fillStyle = '#c9a227';
         ctx.font = `italic ${flavorFont}px Fraunces, serif`;
-        ctx.fillText(flavors.join('  ·  '), pad + 20, y);
+        ctx.fillText(flavors.join('  ·  '), pad + 40, y);
         y += flavorGap;
       }
       y += thirdGap;
@@ -339,8 +378,8 @@ async function generateEntryImage(entry) {
   }
 
   ctx.fillStyle = '#8d91a8';
-  ctx.font = 'italic 17px Fraunces, serif';
-  ctx.fillText('True Herf Cigar Journal', pad, H - 30);
+  ctx.font = 'italic 34px Fraunces, serif';
+  ctx.fillText('True Herf Cigar Journal', pad, H - 60);
 
   return canvas.toDataURL('image/png');
 }
