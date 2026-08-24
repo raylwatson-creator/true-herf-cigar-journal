@@ -535,6 +535,12 @@ function GlobalStyles() {
     .font-mono { font-family: 'JetBrains Mono', monospace; }
     * { font-family: 'Source Sans 3', ui-sans-serif, system-ui; }
     .font-serif, .font-serif * { font-family: 'Fraunces', serif; }
+    html, body, #root { height: 100%; }
+    /* iOS standalone PWA: 100vh (Tailwind's min-h-screen) is taller than the real visible
+       viewport once installed to the home screen, so pages run past the bottom of the
+       screen. 100dvh tracks the actual visible viewport; the 100vh line stays first as a
+       fallback for browsers that don't understand dvh yet. */
+    .min-h-screen { min-height: 100vh; min-height: 100dvh; }
     .app-shell {
       background-image:
         radial-gradient(ellipse 700px 420px at 50% -8%, rgba(201,162,39,0.18), transparent 62%),
