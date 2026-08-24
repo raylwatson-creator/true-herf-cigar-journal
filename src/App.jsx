@@ -1435,13 +1435,39 @@ function DetailView({ entry, onDelete, onEdit }) {
     setDownloading(true);
     try {
       const dataUrl = await generateEntryImage(entry);
-      const a = document.createElement('a');
       const safeBrand = (entry.brand || 'cigar').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      a.href = dataUrl;
-      a.download = `${safeBrand}-${entry.date}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const filename = `${safeBrand}-${entry.date}.png`;
+
+      // iOS Safari (including installed PWAs) ignores the <a download> attribute and won't
+      // navigate to a large data: URL, so the old anchor-click approach silently did nothing
+      // on iPhone/iPad. Prefer the native share sheet (which offers "Save Image") when the
+      // platform supports sharing files, and only fall back to the old download-link approach
+      // where that isn't available (desktop browsers, older Android/Safari).
+      let shared = false;
+      if (navigator.share && navigator.canShare) {
+        try {
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          const file = new File([blob], filename, { type: 'image/png' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: filename });
+            shared = true;
+          }
+        } catch (shareErr) {
+          // AbortError = the user closed the share sheet on purpose; don't also fire the
+          // download fallback in that case. Any other failure falls through below.
+          if (shareErr && shareErr.name === 'AbortError') shared = true;
+        }
+      }
+
+      if (!shared) {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
     } catch (e) {
       // ignore, could surface error state if desired
     } finally {
