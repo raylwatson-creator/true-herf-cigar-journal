@@ -184,10 +184,13 @@ async function generateEntryImage(entry) {
   const ctx = canvas.getContext('2d');
 
   // thirds — auto-fit to whatever room is left so the card stays a fixed 9:16
+  // "Thoughts on the final draw" rides along in the same list so it shares the identical
+  // auto-shrink/clip safety net as the three thirds, rather than needing its own layout math.
   const thirdsList = [
     ['First third', entry.thirds?.first, entry.thirdsFlavors?.first],
     ['Second third', entry.thirds?.second, entry.thirdsFlavors?.second],
     ['Final third', entry.thirds?.final, entry.thirdsFlavors?.final],
+    ['Thoughts on the final draw', entry.finalThoughts, null],
   ].filter(([, v]) => v);
 
   const measureThirds = (scale) => {
@@ -1426,6 +1429,21 @@ function Field({ label, children }) {
   );
 }
 
+// iOS Safari (including installed PWAs) is the platform that ignores the <a download>
+// attribute and can't navigate to a large data: URL, which is what the share-sheet branch
+// in handleDownload below exists to work around. Android Chrome also implements
+// navigator.share/canShare, so without this check the share sheet was opening on Android
+// too — replacing what used to be an automatic, no-interaction download there. Detect iOS
+// (including iPadOS, which reports as "Mac" but exposes touch support) so the share-sheet
+// path only runs where it's actually needed.
+function isIOSDevice() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || navigator.vendor || '';
+  const isClassicIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  const isIPadOS13Plus = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  return isClassicIOS || isIPadOS13Plus;
+}
+
 function DetailView({ entry, onDelete, onEdit }) {
   const [confirming, setConfirming] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -1440,11 +1458,12 @@ function DetailView({ entry, onDelete, onEdit }) {
 
       // iOS Safari (including installed PWAs) ignores the <a download> attribute and won't
       // navigate to a large data: URL, so the old anchor-click approach silently did nothing
-      // on iPhone/iPad. Prefer the native share sheet (which offers "Save Image") when the
-      // platform supports sharing files, and only fall back to the old download-link approach
-      // where that isn't available (desktop browsers, older Android/Safari).
+      // on iPhone/iPad. Prefer the native share sheet (which offers "Save Image") on iOS,
+      // and use the old download-link approach everywhere else (desktop browsers, Android)
+      // so Android keeps its automatic, no-interaction download instead of popping the
+      // native share sheet.
       let shared = false;
-      if (navigator.share && navigator.canShare) {
+      if (isIOSDevice() && navigator.share && navigator.canShare) {
         try {
           const res = await fetch(dataUrl);
           const blob = await res.blob();
