@@ -857,6 +857,9 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
               height: 56,
               background: 'linear-gradient(155deg, #b5652f, #8a4f24)',
               color: '#f6ecd9',
+              // Pinned to the highest stacking layer in the app so nothing — current or
+              // future (modals, overlays, banners) — can ever render on top of it.
+              zIndex: 9999,
             }}
           >
             <Plus size={26} />
