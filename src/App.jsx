@@ -840,7 +840,7 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
         ) : view === 'edit' && active ? (
           <AddView initialEntry={active} onSave={editEntry} onCancel={() => setView('detail')} />
         ) : view === 'stats' ? (
-          <StatsView entries={entries} />
+          <StatsView entries={entries} onOpenEntry={(id) => { setActiveId(id); setView('detail'); }} />
         ) : view === 'guide' ? (
           <GuideView userEmail={userEmail} onLogout={onLogout} />
         ) : view === 'detail' && active ? (
@@ -1632,7 +1632,9 @@ function InfoChip({ label, value }) {
   );
 }
 
-function StatsView({ entries }) {
+function StatsView({ entries, onOpenEntry }) {
+  const [selectedBrand, setSelectedBrand] = useState(null);
+
   if (entries.length === 0) {
     return <EmptyState text="Log a few cigars to see your stats here." />;
   }
@@ -1645,6 +1647,12 @@ function StatsView({ entries }) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([name, count]) => ({ name, count }));
+
+  // Cigars logged under whichever brand bar was last tapped, newest first — shown in the
+  // "Cigars under this brand" card at the bottom of the page.
+  const brandEntries = selectedBrand
+    ? entries.filter((e) => e.brand === selectedBrand).sort((a, b) => b.date.localeCompare(a.date))
+    : [];
 
   const overTime = [...entries]
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -1667,7 +1675,13 @@ function StatsView({ entries }) {
             <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#8d91a8' }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#8d91a8' }} />
             <Tooltip contentStyle={tooltipStyle} />
-            <Bar dataKey="count" fill="#b5652f" radius={[4, 4, 0, 0]} />
+            <Bar
+              dataKey="count"
+              fill="#b5652f"
+              radius={[4, 4, 0, 0]}
+              cursor="pointer"
+              onClick={(data) => setSelectedBrand(data.name)}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -1684,6 +1698,45 @@ function StatsView({ entries }) {
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {selectedBrand && (
+        <div className="p-4 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#c9a227' }}>
+              {selectedBrand} ({brandEntries.length})
+            </div>
+            <button onClick={() => setSelectedBrand(null)} style={{ color: '#71758f' }}>
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex flex-col gap-3">
+            {brandEntries.map((e) => (
+              <button
+                key={e.id}
+                onClick={() => onOpenEntry(e.id)}
+                className="flex items-center gap-3 p-3 rounded-xl text-left btn-raised-sm"
+                style={{ background: '#131b46', border: '1px solid #131a43' }}
+              >
+                {e.photo ? (
+                  <img src={e.photo} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" style={{ border: '1px solid #131a43' }} />
+                ) : (
+                  <div className="w-14 h-14 rounded-lg shrink-0 flex items-center justify-center" style={{ background: '#0a0f2e' }}>
+                    <Camera size={18} style={{ color: '#696c80' }} />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="font-serif font-semibold truncate" style={{ color: '#f3e9d8', fontSize: 16 }}>
+                    {e.name || e.vitola || e.brand}
+                  </div>
+                  <div className="text-sm truncate" style={{ color: '#8d91a8' }}>{e.vitola}</div>
+                  <div className="text-xs mt-0.5" style={{ color: '#696c80' }}>{fmtDate(e.date)}</div>
+                </div>
+                <CigarBand rating={e.rating} size={44} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
