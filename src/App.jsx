@@ -1099,64 +1099,89 @@ function ListView({ entries, query, setQuery, onOpen, total }) {
         <EmptyState text="Your humidor is empty. Log your first cigar to start the journal." />
       ) : entries.length === 0 ? (
         <EmptyState text="No entries match that search." />
-      ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-3 gap-2">
-          {entries.map((e) => (
-            <button
-              key={e.id}
-              onClick={() => onOpen(e.id)}
-              className="relative rounded-lg overflow-hidden btn-raised-sm"
-              style={{ aspectRatio: '1 / 1', border: '1px solid #131a43' }}
-            >
-              {e.photo ? (
-                <img src={e.photo} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center" style={{ background: '#131b46' }}>
-                  <Camera size={20} style={{ color: '#696c80' }} />
-                </div>
-              )}
-              <div
-                className="absolute bottom-1 right-1 font-serif font-semibold rounded-full"
-                style={{
-                  background: 'rgba(10,15,46,0.82)',
-                  border: '1px solid #c9a22766',
-                  color: '#f3e9d8',
-                  fontSize: 10,
-                  padding: '2px 6px',
-                  lineHeight: 1.3,
-                }}
-              >
-                {e.rating.toFixed(1)}
-              </div>
-            </button>
-          ))}
-        </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {entries.map((e) => (
-            <button
-              key={e.id}
-              onClick={() => onOpen(e.id)}
-              className="flex items-center gap-3 p-3 rounded-xl text-left btn-raised-sm"
-              style={{ background: '#0a0f2e', border: '1px solid #131a43' }}
-            >
-              {e.photo ? (
-                <img src={e.photo} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" style={{ border: '1px solid #131a43' }} />
-              ) : (
-                <div className="w-14 h-14 rounded-lg shrink-0 flex items-center justify-center" style={{ background: '#131b46' }}>
-                  <Camera size={18} style={{ color: '#696c80' }} />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="font-serif font-semibold truncate" style={{ color: '#f3e9d8', fontSize: 16 }}>
-                  {e.brand}
-                </div>
-                <div className="text-sm truncate" style={{ color: '#8d91a8' }}>{e.name || e.vitola}</div>
-                <div className="text-xs mt-0.5" style={{ color: '#696c80' }}>{fmtDate(e.date)}</div>
-              </div>
-              <CigarBand rating={e.rating} size={44} />
-            </button>
-          ))}
+        <div style={{ position: 'relative', overflow: 'hidden' }}>
+          {/* Grid <-> list toggle transition: whichever view is entering fades in
+              (list also slides down); whichever is leaving fades out (list also
+              slides up). Grid never slides, only fades. Both start in the same
+              tick with the same 600ms duration, so there's no stagger between
+              them — matches the mockup Ray approved. mode="popLayout" lets the
+              two overlap without the parent collapsing height mid-transition,
+              since list rows and grid tiles are different heights. */}
+          <AnimatePresence mode="popLayout" initial={false}>
+            {viewMode === 'grid' ? (
+              <motion.div
+                key="grid"
+                className="grid grid-cols-3 gap-2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] } }}
+                exit={{ opacity: 0, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] } }}
+              >
+                {entries.map((e) => (
+                  <button
+                    key={e.id}
+                    onClick={() => onOpen(e.id)}
+                    className="relative rounded-lg overflow-hidden btn-raised-sm"
+                    style={{ aspectRatio: '1 / 1', border: '1px solid #131a43' }}
+                  >
+                    {e.photo ? (
+                      <img src={e.photo} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center" style={{ background: '#131b46' }}>
+                        <Camera size={20} style={{ color: '#696c80' }} />
+                      </div>
+                    )}
+                    <div
+                      className="absolute bottom-1 right-1 font-serif font-semibold rounded-full"
+                      style={{
+                        background: 'rgba(10,15,46,0.82)',
+                        border: '1px solid #c9a22766',
+                        color: '#f3e9d8',
+                        fontSize: 10,
+                        padding: '2px 6px',
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {e.rating.toFixed(1)}
+                    </div>
+                  </button>
+                ))}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="list"
+                className="flex flex-col gap-3"
+                initial={{ opacity: 0, y: -16 }}
+                animate={{ opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } }}
+                exit={{ opacity: 0, y: -16, transition: { duration: 0.6, ease: [0.7, 0, 0.84, 0] } }}
+              >
+                {entries.map((e) => (
+                  <button
+                    key={e.id}
+                    onClick={() => onOpen(e.id)}
+                    className="flex items-center gap-3 p-3 rounded-xl text-left btn-raised-sm"
+                    style={{ background: '#0a0f2e', border: '1px solid #131a43' }}
+                  >
+                    {e.photo ? (
+                      <img src={e.photo} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" style={{ border: '1px solid #131a43' }} />
+                    ) : (
+                      <div className="w-14 h-14 rounded-lg shrink-0 flex items-center justify-center" style={{ background: '#131b46' }}>
+                        <Camera size={18} style={{ color: '#696c80' }} />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-serif font-semibold truncate" style={{ color: '#f3e9d8', fontSize: 16 }}>
+                        {e.brand}
+                      </div>
+                      <div className="text-sm truncate" style={{ color: '#8d91a8' }}>{e.name || e.vitola}</div>
+                      <div className="text-xs mt-0.5" style={{ color: '#696c80' }}>{fmtDate(e.date)}</div>
+                    </div>
+                    <CigarBand rating={e.rating} size={44} />
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
       </div>
