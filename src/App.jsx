@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, Search, Camera, ChevronLeft, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star, List, LayoutGrid } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Plus, Search, Camera, ChevronLeft, ChevronRight, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star, List, LayoutGrid } from 'lucide-react';
 
 const ENTRIES_API = '/.netlify/functions/entries';
 const DEVICE_ID_KEY = 'cigar-device-id';
@@ -1722,6 +1722,11 @@ function InfoChip({ label, value }) {
 
 function StatsView({ entries, onOpenEntry }) {
   const [selectedBrand, setSelectedBrand] = useState(null);
+  const [calDate, setCalDate] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const [selectedDay, setSelectedDay] = useState(null);
 
   if (entries.length === 0) {
     return <EmptyState text="Log a few cigars to see your stats here." />;
@@ -1742,11 +1747,40 @@ function StatsView({ entries, onOpenEntry }) {
     ? entries.filter((e) => e.brand === selectedBrand).sort((a, b) => b.date.localeCompare(a.date))
     : [];
 
-  const overTime = [...entries]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map((e) => ({ date: e.date.slice(5), rating: e.rating }));
-
   const tooltipStyle = { fontSize: 12, borderRadius: 8, background: '#131b46', border: '1px solid #1b2455', color: '#f3e9d8' };
+
+  // Cigar Calendar: entries grouped by their logged date (YYYY-MM-DD, same key the
+  // date input already stores), so the currently-displayed month can look each day up directly.
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const entriesByDate = {};
+  entries.forEach((e) => {
+    (entriesByDate[e.date] = entriesByDate[e.date] || []).push(e);
+  });
+
+  const firstOfMonth = new Date(calDate.year, calDate.month, 1);
+  const startWeekday = firstOfMonth.getDay();
+  const daysInMonth = new Date(calDate.year, calDate.month + 1, 0).getDate();
+  const monthLabel = firstOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+
+  const calCells = [];
+  for (let i = 0; i < startWeekday; i++) calCells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calDate.year}-${pad2(calDate.month + 1)}-${pad2(d)}`;
+    calCells.push({ day: d, dateStr, dayEntries: entriesByDate[dateStr] || [] });
+  }
+
+  const goPrevMonth = () => setCalDate((c) => (c.month === 0 ? { year: c.year - 1, month: 11 } : { year: c.year, month: c.month - 1 }));
+  const goNextMonth = () => setCalDate((c) => (c.month === 11 ? { year: c.year + 1, month: 0 } : { year: c.year, month: c.month + 1 }));
+
+  const handleDayClick = (dateStr, dayEntries) => {
+    if (!dayEntries.length) return;
+    setSelectedDay((cur) => (cur === dateStr ? null : dateStr));
+  };
+
+  const selectedDayEntries = selectedDay ? (entriesByDate[selectedDay] || []) : [];
 
   return (
     <div className="px-5 pt-4 flex flex-col gap-5">
@@ -1775,16 +1809,106 @@ function StatsView({ entries, onOpenEntry }) {
       </div>
 
       <div className="p-4 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
-        <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>Rating over time</div>
-        <ResponsiveContainer width="100%" height={160}>
-          <LineChart data={overTime} margin={{ left: -20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#131a43" />
-            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8d91a8' }} />
-            <YAxis domain={[0, 5]} tick={{ fontSize: 11, fill: '#8d91a8' }} />
-            <Tooltip contentStyle={tooltipStyle} />
-            <Line type="monotone" dataKey="rating" stroke="#c9a227" strokeWidth={2} dot={{ r: 3, fill: '#c9a227' }} />
-          </LineChart>
-        </ResponsiveContainer>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#c9a227' }}>{monthLabel}</div>
+          <div className="flex items-center gap-3">
+            <button onClick={goPrevMonth} style={{ color: '#8d91a8' }} aria-label="Previous month">
+              <ChevronLeft size={16} />
+            </button>
+            <button onClick={goNextMonth} style={{ color: '#8d91a8' }} aria-label="Next month">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-7 mb-1.5">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+            <div key={i} className="text-center" style={{ fontSize: 9, textTransform: 'uppercase', color: '#696c80' }}>{d}</div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {calCells.map((cell, i) => {
+            if (!cell) return <div key={`blank-${i}`} style={{ aspectRatio: '1 / 1', visibility: 'hidden' }} />;
+            const hasEntries = cell.dayEntries.length > 0;
+            const first = cell.dayEntries[0];
+            const isToday = cell.dateStr === todayStr;
+            return (
+              <button
+                key={cell.dateStr}
+                onClick={() => handleDayClick(cell.dateStr, cell.dayEntries)}
+                disabled={!hasEntries}
+                className="rounded-lg relative"
+                style={{
+                  aspectRatio: '1 / 1',
+                  background: hasEntries
+                    ? (first.photo ? `url("${first.photo}") center/cover no-repeat` : '#131b46')
+                    : '#10163d',
+                  outline: isToday ? '1px solid #c9a227' : 'none',
+                  outlineOffset: -1,
+                  cursor: hasEntries ? 'pointer' : 'default',
+                }}
+              >
+                <span
+                  className="font-semibold"
+                  style={
+                    hasEntries
+                      ? { position: 'absolute', top: 3, left: 3, fontSize: 8.5, color: '#f3e9d8', background: 'rgba(6,9,26,0.72)', borderRadius: 4, padding: '1px 4px' }
+                      : { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#8d91a8' }
+                  }
+                >
+                  {cell.day}
+                </span>
+                {cell.dayEntries.length > 1 && (
+                  <span
+                    style={{
+                      position: 'absolute', bottom: 3, right: 3, background: '#c9a227', color: '#06091a',
+                      fontSize: 7.5, fontWeight: 700, borderRadius: 5, padding: '1px 3px', lineHeight: 1.4,
+                    }}
+                  >
+                    +{cell.dayEntries.length - 1}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {selectedDay && (
+          <div className="mt-3.5 pt-3.5" style={{ borderTop: '1px solid #131a43' }}>
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#c9a227' }}>{fmtDate(selectedDay)}</div>
+              <button onClick={() => setSelectedDay(null)} style={{ color: '#71758f' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex flex-col gap-2">
+              {selectedDayEntries.map((e) => (
+                <button
+                  key={e.id}
+                  onClick={() => onOpenEntry(e.id)}
+                  className="flex items-center gap-3 p-3 rounded-xl text-left btn-raised-sm"
+                  style={{ background: '#131b46', border: '1px solid #131a43' }}
+                >
+                  {e.photo ? (
+                    <img src={e.photo} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0" style={{ border: '1px solid #131a43' }} />
+                  ) : (
+                    <div className="w-11 h-11 rounded-lg shrink-0 flex items-center justify-center" style={{ background: '#0a0f2e' }}>
+                      <Camera size={16} style={{ color: '#696c80' }} />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-serif font-semibold truncate" style={{ color: '#f3e9d8', fontSize: 15 }}>
+                      {e.name || e.vitola || e.brand}
+                    </div>
+                    <div className="text-sm truncate" style={{ color: '#8d91a8' }}>{e.vitola}</div>
+                  </div>
+                  <CigarBand rating={e.rating} size={40} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {selectedBrand && (
