@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, Search, Camera, ChevronLeft, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star } from 'lucide-react';
+import { Plus, Search, Camera, ChevronLeft, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star, List, LayoutGrid } from 'lucide-react';
 
 const ENTRIES_API = '/.netlify/functions/entries';
 const DEVICE_ID_KEY = 'cigar-device-id';
+const VIEW_MODE_KEY = 'cigar-list-view-mode';
 const AUTH_TOKEN_KEY = 'cigar-auth-token';
 const AUTH_EMAIL_KEY = 'cigar-auth-email';
 const SIGNUP_API = '/.netlify/functions/auth-signup';
@@ -48,6 +49,24 @@ function getDeviceId() {
   } catch (e) {
     // localStorage unavailable — fall back to a session-only id
     return 'session-' + uid();
+  }
+}
+
+// Remembers whether the Humidor Journal page was left in list or grid view, so the
+// choice sticks across app opens instead of always starting back on list view.
+function getStoredViewMode() {
+  try {
+    return window.localStorage.getItem(VIEW_MODE_KEY) === 'grid' ? 'grid' : 'list';
+  } catch (e) {
+    return 'list';
+  }
+}
+
+function storeViewMode(mode) {
+  try {
+    window.localStorage.setItem(VIEW_MODE_KEY, mode);
+  } catch (e) {
+    // localStorage unavailable — the choice just won't stick this session
   }
 }
 
@@ -971,25 +990,94 @@ function CigarBackdropArt() {
 }
 
 function ListView({ entries, query, setQuery, onOpen, total }) {
+  // 'list': the original detailed row layout. 'grid': a photo-wall of square tiles
+  // (mostly photo, gold rating badge in the corner). Persisted to localStorage so the
+  // choice sticks across app opens instead of always starting back on list view.
+  const [viewMode, setViewModeState] = useState(getStoredViewMode);
+  const setViewMode = (mode) => {
+    setViewModeState(mode);
+    storeViewMode(mode);
+  };
+
   return (
     <div className="px-5 pt-4 relative">
       <CigarBackdropArt />
       <div className="relative" style={{ zIndex: 1 }}>
-      <div className="relative mb-4">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#696c80' }} />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search brand, name, notes…"
-          className="w-full pl-9 pr-3 py-2.5 rounded-lg outline-none text-sm"
-          style={{ background: '#0a0f2e', border: '1px solid #131a43', color: '#f3e9d8' }}
-        />
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#696c80' }} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search brand, name, notes…"
+            className="w-full pl-9 pr-3 py-2.5 rounded-lg outline-none text-sm"
+            style={{ background: '#0a0f2e', border: '1px solid #131a43', color: '#f3e9d8' }}
+          />
+        </div>
+        <div className="flex gap-1.5 shrink-0">
+          <button
+            onClick={() => setViewMode('list')}
+            className="w-9 h-9 rounded-full flex items-center justify-center btn-raised-sm"
+            style={{
+              background: viewMode === 'list' ? '#e8dbc3' : '#131b46',
+              color: viewMode === 'list' ? '#0a0f2e' : '#c9a227',
+              border: '1px solid #c9a22755',
+            }}
+            aria-label="List view"
+          >
+            <List size={16} />
+          </button>
+          <button
+            onClick={() => setViewMode('grid')}
+            className="w-9 h-9 rounded-full flex items-center justify-center btn-raised-sm"
+            style={{
+              background: viewMode === 'grid' ? '#e8dbc3' : '#131b46',
+              color: viewMode === 'grid' ? '#0a0f2e' : '#c9a227',
+              border: '1px solid #c9a22755',
+            }}
+            aria-label="Grid view"
+          >
+            <LayoutGrid size={16} />
+          </button>
+        </div>
       </div>
 
       {total === 0 ? (
         <EmptyState text="Your humidor is empty. Log your first cigar to start the journal." />
       ) : entries.length === 0 ? (
         <EmptyState text="No entries match that search." />
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-3 gap-2">
+          {entries.map((e) => (
+            <button
+              key={e.id}
+              onClick={() => onOpen(e.id)}
+              className="relative rounded-lg overflow-hidden btn-raised-sm"
+              style={{ aspectRatio: '1 / 1', border: '1px solid #131a43' }}
+            >
+              {e.photo ? (
+                <img src={e.photo} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center" style={{ background: '#131b46' }}>
+                  <Camera size={20} style={{ color: '#696c80' }} />
+                </div>
+              )}
+              <div
+                className="absolute bottom-1 right-1 font-serif font-semibold rounded-full"
+                style={{
+                  background: 'rgba(10,15,46,0.82)',
+                  border: '1px solid #c9a22766',
+                  color: '#f3e9d8',
+                  fontSize: 10,
+                  padding: '2px 6px',
+                  lineHeight: 1.3,
+                }}
+              >
+                {e.rating.toFixed(1)}
+              </div>
+            </button>
+          ))}
+        </div>
       ) : (
         <div className="flex flex-col gap-3">
           {entries.map((e) => (
