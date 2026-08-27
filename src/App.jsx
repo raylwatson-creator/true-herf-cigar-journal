@@ -854,29 +854,25 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
             Loading your humidor…
           </div>
         ) : (
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={view}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-            >
-              {view === 'list' ? (
-                <ListView entries={filtered} query={query} setQuery={setQuery} onOpen={(id) => { setActiveId(id); setView('detail'); }} total={entries.length} />
-              ) : view === 'add' ? (
-                <AddView onSave={addEntry} onCancel={() => setView('list')} />
-              ) : view === 'edit' && active ? (
-                <AddView initialEntry={active} onSave={editEntry} onCancel={() => setView('detail')} />
-              ) : view === 'stats' ? (
-                <StatsView entries={entries} onOpenEntry={(id) => { setActiveId(id); setView('detail'); }} />
-              ) : view === 'guide' ? (
-                <GuideView userEmail={userEmail} onLogout={onLogout} />
-              ) : view === 'detail' && active ? (
-                <DetailView entry={active} onDelete={deleteEntry} onEdit={() => setView('edit')} />
-              ) : null}
-            </motion.div>
-          </AnimatePresence>
+          <div style={{ position: 'relative', perspective: 1000, overflow: 'hidden' }}>
+            <AnimatePresence mode="popLayout" initial={false}>
+              <FlipPage key={view}>
+                {view === 'list' ? (
+                  <ListView entries={filtered} query={query} setQuery={setQuery} onOpen={(id) => { setActiveId(id); setView('detail'); }} total={entries.length} />
+                ) : view === 'add' ? (
+                  <AddView onSave={addEntry} onCancel={() => setView('list')} />
+                ) : view === 'edit' && active ? (
+                  <AddView initialEntry={active} onSave={editEntry} onCancel={() => setView('detail')} />
+                ) : view === 'stats' ? (
+                  <StatsView entries={entries} onOpenEntry={(id) => { setActiveId(id); setView('detail'); }} />
+                ) : view === 'guide' ? (
+                  <GuideView userEmail={userEmail} onLogout={onLogout} />
+                ) : view === 'detail' && active ? (
+                  <DetailView entry={active} onDelete={deleteEntry} onEdit={() => setView('edit')} />
+                ) : null}
+              </FlipPage>
+            </AnimatePresence>
+          </div>
         )}
 
         {(view === 'list' || view === 'stats' || view === 'guide') && (
@@ -901,6 +897,50 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
     </div>
   );
 }
+
+// Flip transition wrapper used for the main List/Stats/Guide/Add/Edit/Detail
+// view switch. The outgoing screen lifts off its bottom edge and flips away;
+// the incoming screen flips down from its top edge and drops into place with
+// a slight settle-bounce. Timings match the mockup Ray reviewed at half speed
+// (520ms lift-out, 680ms flip-drop-in, 140ms stagger before the drop starts).
+const FlipPage = React.forwardRef(function FlipPage({ children }, ref) {
+  const [settled, setSettled] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(true), 820);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <motion.div
+      ref={ref}
+      style={{
+        transformOrigin: settled ? '50% 100%' : '50% 0%',
+        backfaceVisibility: 'hidden',
+        transformStyle: 'preserve-3d',
+      }}
+      initial={{ opacity: 0, y: -24, rotateX: 62, scale: 0.95, filter: 'brightness(0.7)' }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        rotateX: 0,
+        scale: 1,
+        filter: 'brightness(1)',
+        transition: { duration: 0.68, delay: 0.14, ease: [0.34, 1.56, 0.64, 1] },
+      }}
+      exit={{
+        opacity: 0,
+        y: -18,
+        rotateX: -68,
+        scale: 0.95,
+        filter: 'brightness(1.35)',
+        transition: { duration: 0.52, ease: [0.4, 0, 0.7, 1] },
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+});
 
 function Header({ view, setView, onBack }) {
   const titles = { list: 'True Herf Cigar Journal', add: 'New Entry', edit: 'Edit Entry', stats: 'Stats', guide: 'Guide', detail: 'Details' };
