@@ -945,7 +945,7 @@ const FlipPage = React.forwardRef(function FlipPage({ children }, ref) {
 function Header({ view, setView, onBack }) {
   const titles = { list: 'True Herf Cigar Journal', add: 'New Entry', edit: 'Edit Entry', stats: 'Stats', guide: 'Guide', detail: 'Details' };
   return (
-    <div className="px-5 pt-6 pb-4 flex items-center justify-between" style={{ borderBottom: '1px solid #131a43' }}>
+    <div className="px-5 pt-6 pb-4" style={{ borderBottom: '1px solid #131a43' }}>
       <div className="flex items-center gap-2">
         {view !== 'list' && (
           <button onClick={onBack} className="p-2.5 -ml-1 rounded-full btn-raised-sm" style={{ color: '#c9a227', background: '#131b46' }}>
@@ -958,13 +958,17 @@ function Header({ view, setView, onBack }) {
               Humidor Journal
             </div>
           )}
-          <h1 className="font-serif font-semibold truncate" style={{ fontSize: 19, color: '#f3e9d8', letterSpacing: '-0.01em', maxWidth: 190 }}>
+          {/* Full title, never clipped — it now has the whole row to itself
+              instead of sharing a line with the nav buttons. */}
+          <h1 className="font-serif font-semibold" style={{ fontSize: 19, color: '#f3e9d8', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
             {titles[view]}
           </h1>
         </div>
       </div>
       {view !== 'add' && view !== 'edit' && (
-        <div className="flex gap-2">
+        // Nav buttons drop to their own row below the title, right-aligned,
+        // with a bit of space above them ("slightly lower").
+        <div className="flex gap-2 justify-end" style={{ marginTop: 14 }}>
           <button
             onClick={() => setView('list')}
             className={`px-4 py-2.5 rounded-full flex items-center gap-1 btn-raised-sm ${view === 'list' ? 'btn-pressed-sm' : ''}`}
