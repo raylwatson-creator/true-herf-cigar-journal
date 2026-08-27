@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Plus, Search, Camera, ChevronLeft, ChevronRight, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star, List, LayoutGrid } from 'lucide-react';
 
@@ -852,19 +853,31 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
           <div className="px-5 py-10 text-center" style={{ color: '#8d91a8' }}>
             Loading your humidor…
           </div>
-        ) : view === 'list' ? (
-          <ListView entries={filtered} query={query} setQuery={setQuery} onOpen={(id) => { setActiveId(id); setView('detail'); }} total={entries.length} />
-        ) : view === 'add' ? (
-          <AddView onSave={addEntry} onCancel={() => setView('list')} />
-        ) : view === 'edit' && active ? (
-          <AddView initialEntry={active} onSave={editEntry} onCancel={() => setView('detail')} />
-        ) : view === 'stats' ? (
-          <StatsView entries={entries} onOpenEntry={(id) => { setActiveId(id); setView('detail'); }} />
-        ) : view === 'guide' ? (
-          <GuideView userEmail={userEmail} onLogout={onLogout} />
-        ) : view === 'detail' && active ? (
-          <DetailView entry={active} onDelete={deleteEntry} onEdit={() => setView('edit')} />
-        ) : null}
+        ) : (
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={view}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+            >
+              {view === 'list' ? (
+                <ListView entries={filtered} query={query} setQuery={setQuery} onOpen={(id) => { setActiveId(id); setView('detail'); }} total={entries.length} />
+              ) : view === 'add' ? (
+                <AddView onSave={addEntry} onCancel={() => setView('list')} />
+              ) : view === 'edit' && active ? (
+                <AddView initialEntry={active} onSave={editEntry} onCancel={() => setView('detail')} />
+              ) : view === 'stats' ? (
+                <StatsView entries={entries} onOpenEntry={(id) => { setActiveId(id); setView('detail'); }} />
+              ) : view === 'guide' ? (
+                <GuideView userEmail={userEmail} onLogout={onLogout} />
+              ) : view === 'detail' && active ? (
+                <DetailView entry={active} onDelete={deleteEntry} onEdit={() => setView('edit')} />
+              ) : null}
+            </motion.div>
+          </AnimatePresence>
+        )}
 
         {(view === 'list' || view === 'stats' || view === 'guide') && (
           <button
