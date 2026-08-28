@@ -1219,7 +1219,15 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
   const [price, setPrice] = useState((initialEntry?.price || '').replace(/^\$\s*/, ''));
   const [pairing, setPairing] = useState(initialEntry?.pairing || '');
   const [rating, setRating] = useState(initialEntry?.rating ?? 3);
-  const [date, setDate] = useState(() => initialEntry?.date || new Date().toISOString().slice(0, 10));
+  // Local calendar date, not new Date().toISOString() — toISOString() converts
+  // to UTC first, which silently rolls over to tomorrow's date in the evening
+  // for any timezone behind UTC. Same local-date approach StatsView's Cigar
+  // Calendar already uses correctly for "today".
+  const [date, setDate] = useState(() => {
+    if (initialEntry?.date) return initialEntry.date;
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [firstThird, setFirstThird] = useState(initialEntry?.thirds?.first || '');
   const [secondThird, setSecondThird] = useState(initialEntry?.thirds?.second || '');
   const [finalThird, setFinalThird] = useState(initialEntry?.thirds?.final || '');
