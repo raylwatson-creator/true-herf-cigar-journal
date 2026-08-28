@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Plus, Search, Camera, ChevronLeft, ChevronRight, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star, List, LayoutGrid } from 'lucide-react';
@@ -1291,7 +1292,13 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
         <input ref={galleryRef} type="file" accept="image/*" onChange={handlePhoto} className="hidden" />
       </div>
 
-      {showPhotoMenu && (
+      {/* Rendered through a portal straight to document.body so it's always
+          positioned relative to the real screen, not whatever transformed
+          ancestor happens to be animating it in (e.g. the FlipPage view
+          wrapper) — a CSS transform on any ancestor otherwise hijacks what
+          "fixed" is measured against, pinning this to the bottom of the
+          full scrollable form instead of the visible viewport. */}
+      {showPhotoMenu && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-end justify-center"
           style={{ background: 'rgba(0,0,0,0.55)' }}
@@ -1332,7 +1339,8 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
               Cancel
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <Field label="Brand *">
