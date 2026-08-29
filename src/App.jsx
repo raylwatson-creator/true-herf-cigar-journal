@@ -1053,12 +1053,11 @@ function ListView({ entries, query, setQuery, onOpen, total }) {
   // choice sticks across app opens instead of always starting back on list view.
   const [viewMode, setViewModeState] = useState(getStoredViewMode);
   // Tracks whether the switch that produced the current viewMode was list->grid,
-  // so the grid can tell whether it's entering sequentially (wait for the list to
-  // fully exit, then slide down) versus a grid<->list switch where it just fades
-  // (simultaneous, unchanged). Set from the click handler rather than derived by
-  // diffing viewMode against a ref mutated during render — a ref written mid-render
-  // gets advanced by React.StrictMode's double-invocation of the render body before
-  // the committed render reads it, so the diff always came out false in dev.
+  // which picks AnimatePresence's mode (see below) for that transition. Set from
+  // the click handler rather than derived by diffing viewMode against a ref
+  // mutated during render — a ref written mid-render gets advanced by
+  // React.StrictMode's double-invocation of the render body before the committed
+  // render reads it, so the diff always came out false in dev.
   const [isListToGrid, setIsListToGrid] = useState(false);
   const setViewMode = (mode) => {
     setIsListToGrid(viewMode === 'list' && mode === 'grid');
@@ -1118,25 +1117,32 @@ function ListView({ entries, query, setQuery, onOpen, total }) {
           {/* Grid <-> list toggle transition. Grid -> List (unchanged):
               simultaneous — grid fades out while list fades in + slides down,
               both starting the same instant, same 600ms duration, no stagger.
-              List -> Grid (sequential, per Ray's request): the list runs its
-              full slide-up-and-fade-out exit first; only once that 600ms
-              completes does the grid slide down + fade in over its own 600ms
-              (see the grid motion.div's `delay` below) — so the two never
-              overlap in that direction. mode="popLayout" lets the exiting
-              view leave the document flow immediately so the parent doesn't
-              collapse/jump height mid-transition, since list rows and grid
-              tiles are different heights. */}
-          <AnimatePresence mode="popLayout" initial={false}>
+              mode="popLayout" pops the exiting view out of flow (position:
+              absolute) so the entering one can take over the layout without
+              the parent collapsing/jumping height mid-transition, since list
+              rows and grid tiles are different heights — the two are only
+              ever *simultaneously* visible in this direction, so the momentary
+              flow handoff to the entering (taller/shorter) view isn't visible
+              as a jump.
+              List -> Grid (sequential, per Ray's request): mode="wait"
+              instead — framer-motion then keeps the list as the *only*
+              rendered child, in normal flow (not popped absolute), until its
+              slide-up-and-fade-out exit fully finishes, and only then mounts
+              the grid fresh. That's what actually keeps the list fully
+              visible while exiting instead of getting clipped by the
+              container snapping to the grid's (different, usually shorter)
+              height the instant the grid entered flow — which is what
+              popLayout would otherwise do here, since it puts the entering
+              grid into flow immediately (just invisible) while popping the
+              *list* to absolute, so the container's height follows the grid
+              from the first frame and clips the still-exiting list to it. */}
+          <AnimatePresence mode={isListToGrid ? 'wait' : 'popLayout'} initial={false}>
             {viewMode === 'grid' ? (
               <motion.div
                 key="grid"
                 className="grid grid-cols-3 gap-2"
-                initial={isListToGrid ? { opacity: 0, y: -16 } : { opacity: 0 }}
-                animate={
-                  isListToGrid
-                    ? { opacity: 1, y: 0, transition: { duration: 0.6, delay: 0.6, ease: [0.16, 1, 0.3, 1] } }
-                    : { opacity: 1, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] } }
-                }
+                initial={{ opacity: 0, y: -16 }}
+                animate={{ opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } }}
                 exit={{ opacity: 0, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] } }}
               >
                 {entries.map((e) => (
