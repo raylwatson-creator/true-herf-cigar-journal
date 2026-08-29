@@ -1052,7 +1052,16 @@ function ListView({ entries, query, setQuery, onOpen, total }) {
   // (mostly photo, gold rating badge in the corner). Persisted to localStorage so the
   // choice sticks across app opens instead of always starting back on list view.
   const [viewMode, setViewModeState] = useState(getStoredViewMode);
+  // Tracks whether the switch that produced the current viewMode was list->grid,
+  // so the grid can tell whether it's entering sequentially (wait for the list to
+  // fully exit, then slide down) versus a grid<->list switch where it just fades
+  // (simultaneous, unchanged). Set from the click handler rather than derived by
+  // diffing viewMode against a ref mutated during render — a ref written mid-render
+  // gets advanced by React.StrictMode's double-invocation of the render body before
+  // the committed render reads it, so the diff always came out false in dev.
+  const [isListToGrid, setIsListToGrid] = useState(false);
   const setViewMode = (mode) => {
+    setIsListToGrid(viewMode === 'list' && mode === 'grid');
     setViewModeState(mode);
     storeViewMode(mode);
   };
@@ -1106,20 +1115,28 @@ function ListView({ entries, query, setQuery, onOpen, total }) {
         <EmptyState text="No entries match that search." />
       ) : (
         <div style={{ position: 'relative', overflow: 'hidden' }}>
-          {/* Grid <-> list toggle transition: whichever view is entering fades in
-              (list also slides down); whichever is leaving fades out (list also
-              slides up). Grid never slides, only fades. Both start in the same
-              tick with the same 600ms duration, so there's no stagger between
-              them — matches the mockup Ray approved. mode="popLayout" lets the
-              two overlap without the parent collapsing height mid-transition,
-              since list rows and grid tiles are different heights. */}
+          {/* Grid <-> list toggle transition. Grid -> List (unchanged):
+              simultaneous — grid fades out while list fades in + slides down,
+              both starting the same instant, same 600ms duration, no stagger.
+              List -> Grid (sequential, per Ray's request): the list runs its
+              full slide-up-and-fade-out exit first; only once that 600ms
+              completes does the grid slide down + fade in over its own 600ms
+              (see the grid motion.div's `delay` below) — so the two never
+              overlap in that direction. mode="popLayout" lets the exiting
+              view leave the document flow immediately so the parent doesn't
+              collapse/jump height mid-transition, since list rows and grid
+              tiles are different heights. */}
           <AnimatePresence mode="popLayout" initial={false}>
             {viewMode === 'grid' ? (
               <motion.div
                 key="grid"
                 className="grid grid-cols-3 gap-2"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] } }}
+                initial={isListToGrid ? { opacity: 0, y: -16 } : { opacity: 0 }}
+                animate={
+                  isListToGrid
+                    ? { opacity: 1, y: 0, transition: { duration: 0.6, delay: 0.6, ease: [0.16, 1, 0.3, 1] } }
+                    : { opacity: 1, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] } }
+                }
                 exit={{ opacity: 0, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] } }}
               >
                 {entries.map((e) => (
