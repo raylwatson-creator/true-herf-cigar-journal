@@ -32,10 +32,13 @@ export default async (req) => {
       amount: PRICE_CENTS,
       currency: "usd",
       receipt_email: email,
-      // automatic_payment_methods lets Stripe decide what to show (card,
-      // wallets, etc.) based on the account's settings, rather than hard
-      // coding "card" here.
-      automatic_payment_methods: { enabled: true },
+      // Card only, matching the frontend's plain Card Element (not the
+      // unified Payment Element). Deliberately not using
+      // automatic_payment_methods: it offers Bank, Klarna, Cash App Pay,
+      // and Amazon Pay regardless of "allow_redirects: never", and all of
+      // those need a full page redirect-and-return that this checkout (a
+      // single-page confirm-and-done flow) doesn't handle.
+      payment_method_types: ["card"],
       metadata: { email, product: "true_herf_full_access" },
     });
 
