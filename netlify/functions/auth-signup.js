@@ -30,6 +30,24 @@ export default async (req) => {
       return json(409, { error: "An account with this email already exists." });
     }
 
+    // Paywall gate: this email needs a completed, not-yet-used purchase on
+    // file before an account can be created. This is the one and only place
+    // the purchase requirement is enforced -- it's a database lookup, not a
+    // client-side check, so there's no way to reach this by skipping the
+    // marketing/checkout page. Logging in (auth-login.js) is untouched and
+    // has no purchase check, so this only affects brand new accounts.
+    const [purchase] = await db.sql`
+      SELECT id FROM purchases
+      WHERE email = ${email} AND claimed_at IS NULL
+      ORDER BY created_at ASC
+      LIMIT 1
+    `;
+    if (!purchase) {
+      return json(402, {
+        error: "We don't see a completed purchase for this email yet. Please buy access first, then create your account.",
+      });
+    }
+
     const pinHash = hashPin(pin);
 
     const [user] = await db.sql`
@@ -37,6 +55,8 @@ export default async (req) => {
       VALUES (${email}, ${pinHash})
       RETURNING id
     `;
+
+    await db.sql`UPDATE purchases SET claimed_at = NOW() WHERE id = ${purchase.id}`;
 
     // Claim this device's existing (previously device-scoped) entries, if any.
     if (deviceId) {
