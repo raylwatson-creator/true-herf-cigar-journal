@@ -24,7 +24,7 @@ export async function sendEmail(to, subject, html) {
   return res.json();
 }
 
-// --- Access email (sent right after a successful $5 purchase) -------------
+// --- Access email (sent right after a successful $2.99 purchase) ---------
 // This is the email a buyer gets immediately after paying: a "thank you",
 // confirmation the journal is unlocked, a direct link into account setup,
 // and an order summary as a receipt. Wording matches the mockup Ray
@@ -44,7 +44,7 @@ function escapeHtml(value) {
 }
 
 // orderNumber, amount, and date are expected pre-formatted (e.g. "#TH-10482",
-// "$5.00", "Aug 29, 2026") -- format them before calling this, not here.
+// "$2.99", "Aug 29, 2026") -- format them before calling this, not here.
 export function accessEmailHtml({ accessLink, orderNumber, amount, date }) {
   const link = escapeHtml(accessLink);
   const order = escapeHtml(orderNumber);

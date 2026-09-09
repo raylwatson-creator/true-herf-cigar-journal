@@ -1,4 +1,4 @@
-// Creates a Stripe PaymentIntent for the $5 one-time purchase. The frontend
+// Creates a Stripe PaymentIntent for the $2.99 one-time purchase. The frontend
 // checkout screen (Stripe Elements) calls this first to get a client secret,
 // then confirms the payment against Stripe directly -- the card number never
 // passes through this function or this server.
@@ -8,7 +8,7 @@ import { EMAIL_RE } from "./_lib/auth.js";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
-const PRICE_CENTS = 500; // $5.00, matches the price shown everywhere in the app copy.
+const PRICE_CENTS = 299; // $2.99, matches the price shown everywhere in the app copy.
 
 const json = (statusCode, body) =>
   new Response(JSON.stringify(body), {
