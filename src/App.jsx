@@ -2171,6 +2171,600 @@ function CodeInput({ value, onChange, autoFocus }) {
   );
 }
 
+// ==================== Marketing landing page + custom checkout ====================
+// Built from the two approved mockups (true-herf-landing-mockup.html and
+// true-herf-custom-paycard-mockup.html). Scoped under the .th-mkt class so none of
+// this CSS can leak into (or collide with) the rest of the app's styles.
+function MarketingStyles() {
+  return (
+    <style>{`
+      .th-mkt{ --navy-deep:#06091A; --navy:#0A0F2E; --panel:#131B46; --panel-border:#283268;
+        --field-bg:#0D1230; --gold:#C9A227; --gold-bright:#E4C34A; --cream:#F3E9D8;
+        --cream-dim:#E8DBC3; --muted:#8D91A8; --muted-dim:#696C80; --copper-1:#B5652F;
+        --copper-2:#8A4F24; --error:#D97066;
+        background:
+          radial-gradient(1200px 600px at 50% -10%, #101a4a 0%, transparent 60%),
+          linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
+        color:var(--cream); min-height:100vh; min-height:100dvh;
+      }
+      .th-mkt *{ box-sizing:border-box; }
+      .th-mkt h1, .th-mkt h2, .th-mkt h3, .th-mkt .serif{ font-family:'Fraunces', serif; }
+      .th-mkt .mono{ font-family:'JetBrains Mono', monospace; }
+      .th-mkt a{ color:inherit; text-decoration:none; }
+      .th-mkt .wrap{ max-width:1100px; margin:0 auto; padding:0 24px; }
+
+      .th-mkt header.th-nav{ position:sticky; top:0; z-index:5; background:rgba(6,9,26,.86);
+        backdrop-filter:blur(10px); border-bottom:1px solid var(--panel-border); }
+      .th-mkt .nav-inner{ display:flex; align-items:center; justify-content:space-between;
+        padding:12px 24px; max-width:1100px; margin:0 auto; }
+      .th-mkt .brand{ display:flex; align-items:center; gap:10px; }
+      .th-mkt .medallion{ width:36px; height:36px; border-radius:50%;
+        background:radial-gradient(circle at 35% 30%, var(--gold-bright), var(--gold) 55%, #8a6f16 100%);
+        display:flex; align-items:center; justify-content:center; border:1.5px solid #7a5f12;
+        box-shadow:0 2px 6px rgba(0,0,0,.5), inset 0 1px 1px rgba(255,255,255,.4); flex-shrink:0; }
+      .th-mkt .medallion span{ font:900 13px 'Fraunces', serif; color:#2a1f04; letter-spacing:.02em; }
+      .th-mkt .brand-name{ font:700 15px 'Fraunces', serif; color:var(--cream); letter-spacing:.01em; }
+      .th-mkt .brand-name small{ display:block; font:500 10px 'Source Sans 3', sans-serif;
+        color:var(--muted); letter-spacing:.14em; text-transform:uppercase; margin-top:1px; }
+
+      .th-mkt .btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px;
+        font:700 14px 'Source Sans 3', sans-serif; padding:11px 22px; border-radius:12px;
+        border:none; cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;
+        white-space:nowrap; }
+      .th-mkt .btn-primary{ color:#fff2e2; background:linear-gradient(180deg, var(--copper-1), var(--copper-2));
+        box-shadow:0 1px 0 rgba(255,255,255,.25) inset, 0 -3px 0 rgba(0,0,0,.28) inset,
+          0 6px 14px rgba(138,79,36,.4); }
+      .th-mkt .btn-primary:active{ transform:translateY(2px);
+        box-shadow:0 1px 0 rgba(255,255,255,.15) inset, 0 -1px 0 rgba(0,0,0,.3) inset; }
+      .th-mkt .btn-primary:disabled{ opacity:.7; cursor:default; }
+      .th-mkt .btn-nav{ padding:9px 18px; font-size:13px; }
+      .th-mkt .btn-ghost{ color:var(--cream-dim); background:transparent; border:1px solid var(--panel-border); }
+
+      .th-mkt .hero{ padding:64px 0 40px; }
+      .th-mkt .hero-grid{ display:grid; grid-template-columns:1.1fr .9fr; gap:48px; align-items:center; }
+      .th-mkt .eyebrow{ display:inline-flex; align-items:center; gap:8px; font:700 11px 'Source Sans 3', sans-serif;
+        letter-spacing:.14em; text-transform:uppercase; color:var(--gold); background:rgba(201,162,39,.1);
+        border:1px solid rgba(201,162,39,.35); padding:6px 12px; border-radius:999px; margin-bottom:20px; }
+      .th-mkt .eyebrow .dot{ width:6px; height:6px; border-radius:50%; background:var(--gold); }
+      .th-mkt .hero h1{ font-size:44px; line-height:1.08; font-weight:700; color:var(--cream); margin-bottom:18px; }
+      .th-mkt .hero h1 em{ font-style:italic; color:var(--gold-bright); font-weight:500; }
+      .th-mkt .hero p.lede{ font-size:17px; color:var(--muted); max-width:480px; margin-bottom:28px; }
+      .th-mkt .hero-ctas{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+      .th-mkt .price-tiny{ display:flex; flex-direction:column; }
+      .th-mkt .price-tiny .amt{ font:700 20px 'JetBrains Mono', monospace; color:var(--gold-bright); }
+      .th-mkt .price-tiny .lbl{ font-size:11px; color:var(--muted-dim); }
+      .th-mkt .reassure{ font-size:13px; color:var(--muted-dim); display:flex; gap:18px; flex-wrap:wrap; margin-top:8px; }
+      .th-mkt .reassure span{ display:inline-flex; align-items:center; gap:6px; }
+      .th-mkt .reassure svg{ width:14px; height:14px; stroke:var(--gold); flex-shrink:0; }
+      .th-mkt .already-member{ margin-top:16px; font-size:12.5px; color:var(--muted-dim); }
+      .th-mkt .already-member a{ color:var(--gold); text-decoration:underline; cursor:pointer; }
+
+      .th-mkt .phone{ width:270px; margin:0 auto; background:#0d1230; border-radius:34px;
+        border:6px solid #1a2150; box-shadow:0 30px 60px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(201,162,39,.15);
+        padding:10px; position:relative; }
+      .th-mkt .phone::before{ content:''; position:absolute; top:16px; left:50%; transform:translateX(-50%);
+        width:70px; height:16px; background:#1a2150; border-radius:10px; z-index:2; }
+      .th-mkt .phone-screen{ background:linear-gradient(180deg,#0e1440,#080b24); border-radius:24px;
+        overflow:hidden; padding:26px 12px 12px; min-height:490px; }
+      .th-mkt .ph-title{ font:700 15px 'Fraunces', serif; color:var(--cream); margin-bottom:2px; }
+      .th-mkt .ph-sub{ font-size:10px; color:var(--muted); margin-bottom:14px; letter-spacing:.04em; }
+      .th-mkt .ph-search{ background:rgba(255,255,255,.05); border:1px solid var(--panel-border);
+        border-radius:10px; padding:8px 10px; font-size:10px; color:var(--muted); margin-bottom:12px; }
+      .th-mkt .ph-card{ display:flex; gap:10px; background:var(--panel); border:1px solid var(--panel-border);
+        border-radius:12px; padding:8px; margin-bottom:8px; align-items:center; }
+      .th-mkt .ph-thumb{ width:44px; height:44px; border-radius:8px; flex-shrink:0;
+        background:linear-gradient(135deg, var(--c1,#6b4226), var(--c2,#3a2414)); }
+      .th-mkt .ph-meta{ flex:1; min-width:0; }
+      .th-mkt .ph-brand{ font:700 11px 'Fraunces', serif; color:var(--cream); white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis; }
+      .th-mkt .ph-name{ font-size:9px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .th-mkt .ph-stars{ font-size:9px; color:var(--gold); letter-spacing:1px; margin-top:2px; }
+      .th-mkt .ph-fab{ position:absolute; bottom:14px; right:14px; width:34px; height:34px; border-radius:50%;
+        background:linear-gradient(180deg, var(--copper-1), var(--copper-2)); display:flex; align-items:center;
+        justify-content:center; color:#fff2e2; font-size:16px; font-weight:700; box-shadow:0 4px 10px rgba(0,0,0,.5); }
+      .th-mkt .ph-tabs{ display:flex; justify-content:space-around; margin-top:14px; padding-top:10px;
+        border-top:1px solid var(--panel-border); }
+      .th-mkt .ph-tab{ font-size:9px; color:var(--muted-dim); display:flex; flex-direction:column;
+        align-items:center; gap:3px; }
+      .th-mkt .ph-tab.active{ color:var(--gold); }
+      .th-mkt .ph-tab .ico{ width:14px; height:14px; border-radius:3px; background:currentColor; opacity:.7; }
+
+      .th-mkt section{ padding:70px 0; }
+      .th-mkt .section-head{ text-align:center; max-width:600px; margin:0 auto 44px; }
+      .th-mkt .section-head .eyebrow{ margin-bottom:14px; }
+      .th-mkt .section-head h2{ font-size:30px; color:var(--cream); margin-bottom:12px; }
+      .th-mkt .section-head p{ color:var(--muted); font-size:15px; }
+
+      .th-mkt .feat-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:20px; }
+      .th-mkt .feat-card{ background:var(--panel); border:1px solid var(--panel-border); border-radius:16px;
+        padding:24px; transition:border-color .15s ease, transform .15s ease; }
+      .th-mkt .feat-card:hover{ border-color:rgba(201,162,39,.5); transform:translateY(-2px); }
+      .th-mkt .feat-ic{ width:38px; height:38px; border-radius:10px; margin-bottom:16px;
+        background:rgba(201,162,39,.12); border:1px solid rgba(201,162,39,.3); display:flex;
+        align-items:center; justify-content:center; }
+      .th-mkt .feat-ic svg{ width:19px; height:19px; stroke:var(--gold); fill:none; }
+      .th-mkt .feat-card h3{ font-size:16px; color:var(--cream); margin-bottom:8px; font-weight:600; }
+      .th-mkt .feat-card p{ font-size:13.5px; color:var(--muted); }
+
+      .th-mkt .shots{ display:flex; gap:22px; justify-content:center; flex-wrap:wrap; }
+      .th-mkt .shot-cap{ text-align:center; margin-top:14px; font-size:12px; color:var(--muted); }
+      .th-mkt .shot-cap b{ color:var(--cream-dim); font-weight:600; }
+      .th-mkt .flavor-chip{ display:inline-block; font-size:8px; padding:2px 6px; border-radius:20px; margin:1px; }
+
+      .th-mkt .video-box{ max-width:300px; margin:0 auto; aspect-ratio:480/1116;
+        background:linear-gradient(135deg,#161f4d,#0a0e2a); border:1px solid var(--panel-border);
+        border-radius:28px; position:relative; overflow:hidden;
+        box-shadow:0 30px 60px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(201,162,39,.15); }
+      .th-mkt .video-box video{ width:100%; height:100%; object-fit:cover; display:block; border-radius:27px; }
+
+      .th-mkt .price-card{ max-width:440px; margin:0 auto; background:var(--panel);
+        border:1px solid rgba(201,162,39,.4); border-radius:22px; padding:40px 32px; text-align:center;
+        box-shadow:0 20px 50px -20px rgba(0,0,0,.6); }
+      .th-mkt .price-card .big{ font:700 56px 'JetBrains Mono', monospace; color:var(--gold-bright); line-height:1; }
+      .th-mkt .price-card .per{ font-size:13px; color:var(--muted); margin:6px 0 24px; letter-spacing:.03em; }
+      .th-mkt .price-list{ text-align:left; margin:0 auto 28px; max-width:300px; list-style:none; }
+      .th-mkt .price-list li{ display:flex; gap:10px; align-items:flex-start; font-size:13.5px;
+        color:var(--cream-dim); margin-bottom:11px; }
+      .th-mkt .price-list svg{ width:15px; height:15px; stroke:var(--gold); flex-shrink:0; margin-top:2px; }
+      .th-mkt .price-card .btn{ width:100%; padding:15px; font-size:15px; }
+
+      .th-mkt .steps{ display:grid; grid-template-columns:repeat(3,1fr); gap:24px; max-width:900px; margin:0 auto; }
+      .th-mkt .step{ text-align:center; padding:0 12px; }
+      .th-mkt .step .num{ width:40px; height:40px; border-radius:50%; margin:0 auto 16px; display:flex;
+        align-items:center; justify-content:center; font:700 16px 'JetBrains Mono', monospace;
+        color:var(--navy-deep); background:linear-gradient(180deg, var(--gold-bright), var(--gold)); }
+      .th-mkt .step h3{ font-size:15px; color:var(--cream); margin-bottom:8px; font-weight:600; }
+      .th-mkt .step p{ font-size:13px; color:var(--muted); }
+
+      .th-mkt .faq{ max-width:680px; margin:0 auto; }
+      .th-mkt .faq details{ background:var(--panel); border:1px solid var(--panel-border); border-radius:12px;
+        padding:16px 18px; margin-bottom:10px; }
+      .th-mkt .faq summary{ cursor:pointer; font-weight:600; font-size:14.5px; color:var(--cream-dim);
+        list-style:none; display:flex; justify-content:space-between; align-items:center; }
+      .th-mkt .faq summary::-webkit-details-marker{ display:none; }
+      .th-mkt .faq summary::after{ content:'+'; color:var(--gold); font-size:18px; font-weight:400; margin-left:12px; }
+      .th-mkt .faq details[open] summary::after{ content:'\\2013'; }
+      .th-mkt .faq p{ font-size:13.5px; color:var(--muted); margin-top:12px; line-height:1.6; }
+
+      .th-mkt footer{ border-top:1px solid var(--panel-border); padding:36px 0; }
+      .th-mkt .foot-inner{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
+      .th-mkt .foot-links{ display:flex; gap:22px; font-size:12.5px; color:var(--muted-dim); }
+      .th-mkt .foot-copy{ font-size:12px; color:var(--muted-dim); }
+
+      /* ---------- checkout ---------- */
+      .th-mkt .th-checkout-wrap{ padding:40px 16px 80px; }
+      .th-mkt .topbar{ width:100%; max-width:920px; display:flex; align-items:center;
+        justify-content:space-between; gap:10px; margin:0 auto 34px; }
+      .th-mkt .topbar-name{ font:700 15px 'Fraunces', serif; }
+      .th-mkt .topbar-name small{ display:block; font:500 10px 'Source Sans 3', sans-serif; color:var(--muted);
+        letter-spacing:.12em; text-transform:uppercase; margin-top:1px; }
+      .th-mkt .back-link{ font-size:13px; color:var(--gold); cursor:pointer; background:none; border:none;
+        font-family:inherit; }
+
+      .th-mkt .stage{ width:100%; max-width:920px; margin:0 auto; display:grid;
+        grid-template-columns:1fr 1.15fr; gap:44px; align-items:start; }
+      .th-mkt .card-col{ position:sticky; top:40px; }
+      .th-mkt .card-eyebrow{ font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+        color:var(--muted-dim); margin-bottom:16px; }
+      .th-mkt .card3d{ width:100%; aspect-ratio:1.586/1; perspective:1400px; margin-bottom:26px; }
+      .th-mkt .card3d-inner{ position:relative; width:100%; height:100%;
+        transition:transform .6s cubic-bezier(.34,1.56,.64,1); transform-style:preserve-3d; }
+      .th-mkt .card3d-inner.flipped{ transform:rotateY(180deg); }
+      .th-mkt .face{ position:absolute; inset:0; border-radius:18px; backface-visibility:hidden;
+        box-shadow:0 22px 44px -16px rgba(0,0,0,.65); overflow:hidden; }
+      .th-mkt .face-front{ background:radial-gradient(420px 200px at 100% 0%, rgba(228,195,74,.16), transparent 60%),
+        linear-gradient(155deg, #16204f 0%, #0c1030 65%, #080b22 100%); border:1px solid rgba(201,162,39,.35);
+        padding:22px 24px; display:flex; flex-direction:column; justify-content:space-between; }
+      .th-mkt .face-back{ background:linear-gradient(155deg, #16204f 0%, #0c1030 65%, #080b22 100%);
+        border:1px solid rgba(201,162,39,.35); transform:rotateY(180deg); }
+      .th-mkt .mag-stripe{ width:100%; height:42px; background:#05070f; margin-top:22px; }
+      .th-mkt .cvc-strip{ margin:22px 24px 0; display:flex; justify-content:flex-end; }
+      .th-mkt .cvc-box{ background:#f3e9d8; color:#1a1400; font:700 13px 'JetBrains Mono', monospace;
+        padding:8px 14px; border-radius:4px; min-width:52px; text-align:center; letter-spacing:2px; }
+      .th-mkt .back-note{ margin:18px 24px; font-size:9.5px; color:var(--muted-dim); line-height:1.5; }
+      .th-mkt .card-row-top{ display:flex; justify-content:space-between; align-items:flex-start; }
+      .th-mkt .chip{ width:38px; height:28px; border-radius:5px;
+        background:linear-gradient(155deg, #f0d68a, #c9a227 55%, #9c7c19); position:relative; overflow:hidden; }
+      .th-mkt .network{ display:flex; }
+      .th-mkt .network .c1, .th-mkt .network .c2{ width:22px; height:22px; border-radius:50%; }
+      .th-mkt .network .c1{ background:rgba(228,195,74,.85); }
+      .th-mkt .network .c2{ background:rgba(181,101,47,.85); margin-left:-9px; }
+      .th-mkt .card-number{ font:600 21px 'JetBrains Mono', monospace; letter-spacing:2.5px; color:var(--cream);
+        margin:18px 0 4px; min-height:26px; }
+      .th-mkt .card-bottom-row{ display:flex; justify-content:space-between; align-items:flex-end; gap:14px; }
+      .th-mkt .card-name{ font:600 13px 'Source Sans 3', sans-serif; letter-spacing:.5px; color:var(--cream-dim);
+        text-transform:uppercase; }
+      .th-mkt .card-name.placeholder, .th-mkt .card-number.placeholder{ color:var(--muted-dim); }
+      .th-mkt .card-expiry{ font:600 13px 'JetBrains Mono', monospace; color:var(--cream-dim); text-align:right; }
+      .th-mkt .card-expiry .lbl{ display:block; font-size:8px; color:var(--muted-dim); letter-spacing:.1em;
+        font-family:'Source Sans 3', sans-serif; margin-bottom:2px; }
+      .th-mkt .card-brand-word{ font:700 14px 'Fraunces', serif; font-style:italic; color:var(--gold-bright);
+        letter-spacing:.02em; }
+      .th-mkt .trust-row{ display:flex; flex-direction:column; gap:10px; font-size:12.5px; color:var(--muted); }
+      .th-mkt .trust-row .item{ display:flex; align-items:center; gap:8px; }
+      .th-mkt .trust-row svg{ width:15px; height:15px; stroke:var(--gold); flex-shrink:0; }
+
+      .th-mkt .form-col{ background:var(--panel); border:1px solid var(--panel-border); border-radius:20px;
+        padding:32px; }
+      .th-mkt .form-head{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:26px;
+        padding-bottom:22px; border-bottom:1px solid var(--panel-border); }
+      .th-mkt .form-head h2{ font-size:19px; color:var(--cream); margin-bottom:4px; }
+      .th-mkt .form-head p{ font-size:12.5px; color:var(--muted); }
+      .th-mkt .price-tag{ text-align:right; flex-shrink:0; }
+      .th-mkt .price-tag .amt{ font:700 26px 'JetBrains Mono', monospace; color:var(--gold-bright); line-height:1; }
+      .th-mkt .price-tag .lbl{ font-size:10.5px; color:var(--muted-dim); margin-top:3px; }
+
+      .th-mkt .th-field{ margin-bottom:18px; }
+      .th-mkt .th-field label{ display:block; font-size:11.5px; font-weight:600; color:var(--muted);
+        letter-spacing:.03em; margin-bottom:7px; text-transform:uppercase; }
+      .th-mkt .th-field input, .th-mkt .th-field .elmnt{ width:100%; background:var(--field-bg);
+        border:1px solid var(--panel-border); border-radius:10px; padding:12px 14px;
+        font:500 14.5px 'Source Sans 3', sans-serif; color:var(--cream); outline:none;
+        transition:border-color .15s ease, box-shadow .15s ease; }
+      .th-mkt .th-field input::placeholder{ color:var(--muted-dim); }
+      .th-mkt .th-field input:focus{ border-color:var(--gold); box-shadow:0 0 0 3px rgba(201,162,39,.15); }
+      .th-mkt .row3{ display:grid; grid-template-columns:1.4fr .8fr .8fr; gap:14px; }
+
+      .th-mkt .secure-note{ display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--muted-dim);
+        margin:4px 0 22px; }
+      .th-mkt .secure-note svg{ width:13px; height:13px; stroke:var(--gold); flex-shrink:0; }
+
+      .th-mkt .pay-btn{ width:100%; padding:16px; border:none; border-radius:13px; cursor:pointer;
+        font:700 15.5px 'Source Sans 3', sans-serif; color:#fff2e2;
+        background:linear-gradient(180deg, var(--copper-1), var(--copper-2));
+        box-shadow:0 1px 0 rgba(255,255,255,.25) inset, 0 -3px 0 rgba(0,0,0,.28) inset,
+          0 8px 18px rgba(138,79,36,.4); display:flex; align-items:center; justify-content:center; gap:10px;
+        transition:transform .12s ease; }
+      .th-mkt .pay-btn:active{ transform:translateY(2px); }
+      .th-mkt .pay-btn:disabled{ opacity:.75; cursor:default; }
+      .th-mkt .pay-spinner{ width:16px; height:16px; border-radius:50%; border:2.5px solid rgba(255,242,226,.35);
+        border-top-color:#fff2e2; animation:thspin .7s linear infinite; }
+      @keyframes thspin{ to{ transform:rotate(360deg); } }
+
+      .th-mkt .cards-accepted{ display:flex; gap:10px; justify-content:center; margin-top:18px; }
+      .th-mkt .mini-card{ width:36px; height:24px; border-radius:4px; border:1px solid var(--panel-border);
+        background:var(--field-bg); display:flex; align-items:center; justify-content:center;
+        font:700 8px 'JetBrains Mono', monospace; color:var(--muted); }
+
+      .th-mkt .th-success{ text-align:center; padding:20px 6px 6px; }
+      .th-mkt .check{ width:60px; height:60px; border-radius:50%; margin:0 auto 20px;
+        background:radial-gradient(circle at 35% 30%, var(--gold-bright), var(--gold)); display:flex;
+        align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(0,0,0,.4); }
+      .th-mkt .check svg{ width:26px; height:26px; stroke:#1a1400; stroke-width:3; }
+      .th-mkt .th-success h3{ font-size:19px; color:var(--cream); margin-bottom:10px; }
+      .th-mkt .th-success p{ font-size:13.5px; color:var(--muted); max-width:340px; margin:0 auto 22px;
+        line-height:1.6; }
+      .th-mkt .mail-chip{ display:inline-flex; align-items:center; gap:8px; background:var(--field-bg);
+        border:1px solid var(--panel-border); border-radius:10px; padding:10px 16px; font-size:13px;
+        color:var(--cream-dim); margin-bottom:6px; }
+
+      .th-mkt .th-error{ margin-bottom:18px; padding:12px 14px; border-radius:10px; font-size:13px;
+        background:rgba(217,112,102,.1); color:#f0b199; border:1px solid rgba(217,112,102,.35); }
+
+      @media (max-width:860px){
+        .th-mkt .hero-grid{ grid-template-columns:1fr; }
+        .th-mkt .hero h1{ font-size:32px; }
+        .th-mkt .hero{ text-align:center; }
+        .th-mkt .hero p.lede{ margin-left:auto; margin-right:auto; }
+        .th-mkt .hero-ctas{ justify-content:center; }
+        .th-mkt .reassure{ justify-content:center; }
+        .th-mkt .feat-grid{ grid-template-columns:1fr 1fr; }
+        .th-mkt .steps{ grid-template-columns:1fr; gap:32px; }
+        .th-mkt .shots{ gap:16px; }
+        .th-mkt section{ padding:52px 0; }
+        .th-mkt .stage{ grid-template-columns:1fr; }
+        .th-mkt .card-col{ position:static; }
+      }
+      @media (max-width:520px){
+        .th-mkt .feat-grid{ grid-template-columns:1fr; }
+        .th-mkt .phone{ width:230px; }
+        .th-mkt .phone-screen{ min-height:420px; }
+        .th-mkt .row3{ grid-template-columns:1fr; }
+      }
+    `}</style>
+  );
+}
+
+// Small check-mark SVG reused across the reassurance list, price list, and trust row.
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.2"><path d="M20 6L9 17l-5-5" /></svg>
+  );
+}
+
+function PhoneMock() {
+  return (
+    <div className="phone">
+      <div className="phone-screen">
+        <div className="ph-title">Humidor Journal</div>
+        <div className="ph-sub">12 cigars logged</div>
+        <div className="ph-search">Search brand, notes, flavor…</div>
+        <div className="ph-card">
+          <div className="ph-thumb"></div>
+          <div className="ph-meta">
+            <div className="ph-brand">Padrón</div>
+            <div className="ph-name">1964 Anniversary Toro</div>
+            <div className="ph-stars">★★★★★</div>
+          </div>
+        </div>
+        <div className="ph-card">
+          <div className="ph-thumb" style={{ '--c1': '#8a5a2f', '--c2': '#4a2f18' }}></div>
+          <div className="ph-meta">
+            <div className="ph-brand">My Father</div>
+            <div className="ph-name">Le Bijou 1922 Robusto</div>
+            <div className="ph-stars">★★★★☆</div>
+          </div>
+        </div>
+        <div className="ph-card">
+          <div className="ph-thumb"></div>
+          <div className="ph-meta">
+            <div className="ph-brand">Don Valdi</div>
+            <div className="ph-name">Nicaraguan Toro</div>
+            <div className="ph-stars">★★★★★</div>
+          </div>
+        </div>
+        <div className="ph-tabs">
+          <div className="ph-tab active"><div className="ico"></div>List</div>
+          <div className="ph-tab"><div className="ico"></div>Stats</div>
+          <div className="ph-tab"><div className="ico"></div>Guide</div>
+        </div>
+        <div className="ph-fab">+</div>
+      </div>
+    </div>
+  );
+}
+
+const FEATURES = [
+  { path: 'M12 2v20M2 12h20', title: 'Log every detail', body: "Brand, line, vitola, wrapper, binder, filler, price, pairing, and a photo. Every cigar, fully recorded." },
+  { path: 'M12 17.3l-5.4 3 1.4-6-4.7-4 6.1-.5L12 4l2.6 5.8 6.1.5-4.7 4 1.4 6z', title: 'Half-star ratings', body: 'Rate with real precision: tap the left or right half of any star, down to the 0.5.' },
+  { path: 'M12 3v18M3 12h18', title: 'Flavor wheel, by the thirds', body: 'Separate tasting notes for the first, second, and final third, each with its own 10-category flavor wheel.', circle: true },
+  { path: 'M3 9h18M8 2v4M16 2v4', title: 'Cigar Calendar', body: 'Every logged day shows the cigar itself, right on the calendar. Tap in to relive it.', rect: true },
+  { path: 'M7 15l4-4 3 3 5-6', title: 'Your stats', body: "Average rating, top brands, and a full drill-down into every cigar you've logged under any brand.", frame: true },
+  { path: 'M12 3v12M8 8l4-5 4 5M5 21h14', title: 'Share an entry', body: 'Download any cigar as a beautiful shareable card: photo, rating, and notes, ready to post.' },
+];
+
+function FeatureIcon({ f }) {
+  return (
+    <svg viewBox="0 0 24 24" strokeWidth="2">
+      {f.circle && <circle cx="12" cy="12" r="9" />}
+      {f.rect && <rect x="3" y="4" width="18" height="17" rx="2" />}
+      {f.frame && <path d="M3 3v18h18" />}
+      <path d={f.path} />
+    </svg>
+  );
+}
+
+// The real marketing/paywall front door. Only ever rendered for a brand new or
+// signed-out visitor -- App() checks getStoredAuth() before this component exists,
+// so a returning member with a valid session never sees it at all.
+function LandingPage({ onCheckout, onLogin }) {
+  return (
+    <div className="th-mkt">
+      <GlobalStyles />
+      <MarketingStyles />
+      <header className="th-nav">
+        <div className="nav-inner">
+          <div className="brand">
+            <div className="medallion"><span>TH</span></div>
+            <div className="brand-name">True Herf<small>Cigar Journal</small></div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <a className="btn btn-ghost btn-nav" onClick={onLogin}>Log In</a>
+            <button className="btn btn-primary btn-nav" onClick={onCheckout}>Start Your Journal</button>
+          </div>
+        </div>
+      </header>
+
+      <div className="wrap hero">
+        <div className="hero-grid">
+          <div>
+            <div className="eyebrow"><span className="dot"></span> One-time purchase · No subscription</div>
+            <h1>Every cigar has a story.<br /><em>Keep yours.</em></h1>
+            <p className="lede">A private, ad-free journal for logging every cigar you smoke: tasting notes by the thirds, half-star ratings, photos, and a flavor wheel built for the real thing. Pay once. It's yours for good.</p>
+            <div className="hero-ctas">
+              <button className="btn btn-primary" onClick={onCheckout}>Start Your Journal</button>
+              <div className="price-tiny">
+                <span className="amt">$2.99</span>
+                <span className="lbl">once, not monthly</span>
+              </div>
+            </div>
+            <div className="reassure">
+              <span><CheckIcon /> No ads, ever</span>
+              <span><CheckIcon /> No subscription</span>
+              <span><CheckIcon /> Installs like an app, no store needed</span>
+            </div>
+            <div className="already-member">Already a member? <a onClick={onLogin}>Log in</a> instead, no payment needed.</div>
+          </div>
+          <PhoneMock />
+        </div>
+      </div>
+
+      <section id="video">
+        <div className="wrap section-head">
+          <div className="eyebrow"><span className="dot"></span> See it in action</div>
+          <h2>A real walkthrough, no cuts</h2>
+          <p>Screen recorded straight from the app, logging a cigar from the brand field to the flavor wheel.</p>
+        </div>
+        <div className="wrap">
+          <div className="video-box">
+            <video src="/th-demo-walkthrough.mp4" controls playsInline muted autoPlay loop preload="auto" />
+          </div>
+        </div>
+      </section>
+
+      <section id="features">
+        <div className="wrap">
+          <div className="section-head">
+            <div className="eyebrow"><span className="dot"></span> What you get</div>
+            <h2>Built for people who actually smoke cigars</h2>
+            <p>Not an inventory tracker. A real journal for the ritual itself.</p>
+          </div>
+          <div className="feat-grid">
+            {FEATURES.map((f) => (
+              <div className="feat-card" key={f.title}>
+                <div className="feat-ic"><FeatureIcon f={f} /></div>
+                <h3>{f.title}</h3>
+                <p>{f.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="shots">
+        <div className="wrap">
+          <div className="section-head">
+            <div className="eyebrow"><span className="dot"></span> A closer look</div>
+            <h2>Every screen, built to enhance the experience</h2>
+          </div>
+          <div className="shots">
+            <div>
+              <div className="phone" style={{ width: 220 }}>
+                <div className="phone-screen" style={{ minHeight: 400, paddingTop: 24 }}>
+                  <div className="ph-title" style={{ fontSize: 13 }}>First Third</div>
+                  <div className="ph-sub" style={{ marginBottom: 10 }}>Tasting notes</div>
+                  <span className="flavor-chip" style={{ background: 'rgba(181,101,47,.25)', color: '#e8b98a' }}>Wood</span>
+                  <span className="flavor-chip" style={{ background: 'rgba(201,162,39,.25)', color: '#e4c34a' }}>Sweet</span>
+                  <span className="flavor-chip" style={{ background: 'rgba(139,94,60,.25)', color: '#c9a888' }}>Nutty</span>
+                  <span className="flavor-chip" style={{ background: 'rgba(120,72,38,.25)', color: '#d9a878' }}>Spice</span>
+                  <div style={{ marginTop: 14, height: 110, borderRadius: 10, background: 'radial-gradient(circle, #2a3568, #131b46)', border: '1px solid var(--panel-border)' }}></div>
+                  <div style={{ marginTop: 12, fontSize: 9, color: 'var(--muted)', lineHeight: 1.5 }}>Cold draw, first light, initial flavors: this section captures the opening third.</div>
+                </div>
+              </div>
+              <div className="shot-cap"><b>Flavor wheel</b>, by the thirds</div>
+            </div>
+            <div>
+              <div className="phone" style={{ width: 220 }}>
+                <div className="phone-screen" style={{ minHeight: 400, paddingTop: 24 }}>
+                  <div className="ph-title" style={{ fontSize: 13 }}>Stats</div>
+                  <div className="ph-sub" style={{ marginBottom: 10 }}>18 cigars · 4.3 avg</div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90, marginBottom: 14 }}>
+                    <div style={{ flex: 1, height: '60%', background: 'var(--gold)', borderRadius: '4px 4px 0 0', opacity: .9 }}></div>
+                    <div style={{ flex: 1, height: '90%', background: 'var(--gold)', borderRadius: '4px 4px 0 0' }}></div>
+                    <div style={{ flex: 1, height: '40%', background: 'var(--gold)', borderRadius: '4px 4px 0 0', opacity: .7 }}></div>
+                    <div style={{ flex: 1, height: '70%', background: 'var(--gold)', borderRadius: '4px 4px 0 0', opacity: .85 }}></div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3 }}>
+                    <div style={{ gridColumn: 'span 7', fontSize: 8, color: 'var(--muted)', marginBottom: 2 }}>August</div>
+                    <div style={{ aspectRatio: '1', background: 'var(--panel-border)', borderRadius: 3 }}></div>
+                    <div style={{ aspectRatio: '1', background: 'var(--gold)', opacity: .5, borderRadius: 3 }}></div>
+                    <div style={{ aspectRatio: '1', background: 'var(--panel-border)', borderRadius: 3 }}></div>
+                    <div style={{ aspectRatio: '1', background: 'var(--gold)', borderRadius: 3 }}></div>
+                    <div style={{ aspectRatio: '1', background: 'var(--panel-border)', borderRadius: 3 }}></div>
+                    <div style={{ aspectRatio: '1', background: 'var(--panel-border)', borderRadius: 3 }}></div>
+                    <div style={{ aspectRatio: '1', background: 'var(--gold)', opacity: .7, borderRadius: 3 }}></div>
+                  </div>
+                </div>
+              </div>
+              <div className="shot-cap"><b>Cigar Calendar</b>: your history at a glance</div>
+            </div>
+            <div>
+              <div className="phone" style={{ width: 220 }}>
+                <div className="phone-screen" style={{ minHeight: 400, paddingTop: 24 }}>
+                  <div style={{ height: 150, borderRadius: 12, background: 'linear-gradient(135deg,#5a3820,#2c1a0e)', marginBottom: 10, position: 'relative' }}>
+                    <div style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(6,9,26,.7)', border: '1px solid var(--gold)', borderRadius: 20, padding: '3px 9px', fontSize: 9, color: 'var(--gold-bright)', fontWeight: 700 }}>★ 5.0</div>
+                  </div>
+                  <div className="ph-brand" style={{ fontSize: 13 }}>Don Valdi</div>
+                  <div className="ph-name" style={{ fontSize: 10, marginBottom: 10 }}>Nicaraguan Toro</div>
+                  <div className="btn btn-primary" style={{ fontSize: 10, padding: 8, width: '100%', textAlign: 'center' }}>Download &amp; Share</div>
+                </div>
+              </div>
+              <div className="shot-cap"><b>Shareable card</b>: export any entry</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing">
+        <div className="wrap">
+          <div className="section-head">
+            <div className="eyebrow"><span className="dot"></span> Simple pricing</div>
+            <h2>Pay once. Smoke on.</h2>
+          </div>
+          <div className="price-card">
+            <div className="big">$2.99</div>
+            <div className="per">one time, not $2.99/month, not $2.99/year</div>
+            <ul className="price-list">
+              <li><CheckIcon /> Unlimited cigars, forever</li>
+              <li><CheckIcon /> Full flavor wheel &amp; tasting notes by the thirds</li>
+              <li><CheckIcon /> Stats, Cigar Calendar &amp; brand drill-downs</li>
+              <li><CheckIcon /> Built-in vitola &amp; wrapper guide</li>
+              <li><CheckIcon /> Shareable entry cards</li>
+              <li><CheckIcon /> Your data, synced &amp; private, never sold</li>
+            </ul>
+            <button className="btn btn-primary" onClick={onCheckout}>Start Your Journal</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="how">
+        <div className="wrap">
+          <div className="section-head">
+            <div className="eyebrow"><span className="dot"></span> After you buy</div>
+            <h2>From payment to your first entry</h2>
+          </div>
+          <div className="steps">
+            <div className="step">
+              <div className="num">1</div>
+              <h3>Pay $2.99, securely</h3>
+              <p>Checkout takes seconds. No account needed yet, just your email.</p>
+            </div>
+            <div className="step">
+              <div className="num">2</div>
+              <h3>Get your access link</h3>
+              <p>A confirmation email lands with a direct link straight into the app, already unlocked for you.</p>
+            </div>
+            <div className="step">
+              <div className="num">3</div>
+              <h3>Create your account &amp; log in</h3>
+              <p>Set your email + a 4-digit PIN, add it to your home screen, and start your journal.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq">
+        <div className="wrap">
+          <div className="section-head">
+            <div className="eyebrow"><span className="dot"></span> Questions</div>
+            <h2>Good to know</h2>
+          </div>
+          <div className="faq">
+            <details open>
+              <summary>Is this really a one-time payment?</summary>
+              <p>Yes: $2.99, once. No subscription, no recurring charge, no "free trial" that quietly starts billing you.</p>
+            </details>
+            <details>
+              <summary>Do I need to download this from an app store?</summary>
+              <p>No. It installs right from your browser. Tap "Add to Home Screen" and it works just like any other app on your phone, no App Store or Play Store required.</p>
+            </details>
+            <details>
+              <summary>What if I lose my access link?</summary>
+              <p>No problem: once you've created your account, you just log back in with your email and PIN like normal. The link is only needed the first time.</p>
+            </details>
+            <details>
+              <summary>Is my journal data private?</summary>
+              <p>Yes. Your entries are tied to your account only, never sold, shared, or shown to anyone else.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <div className="wrap foot-inner">
+          <div className="brand">
+            <div className="medallion" style={{ width: 28, height: 28 }}><span style={{ fontSize: 10 }}>TH</span></div>
+            <span className="foot-copy">© 2026 True Herf Cigar Journal</span>
+          </div>
+          <div className="foot-links">
+            <a onClick={onLogin}>Log In</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
 function AuthShell({ children }) {
   return (
     <div className="min-h-screen w-full relative flex items-center justify-center px-6" style={{ fontFamily: "'Source Sans 3', ui-sans-serif, system-ui" }}>
@@ -2210,156 +2804,246 @@ function AuthButton({ children, onClick, disabled }) {
   );
 }
 
-// The $2.99 checkout: collect an email, create a PaymentIntent, then mount
-// Stripe's Card Element to collect card details. It never learns the
-// claim_token that unlocks account creation -- that's generated by the
-// webhook once Stripe confirms payment, and only reaches the buyer by
-// email, so success here just points them at their inbox.
+// The $2.99 checkout: a custom-styled pay card (matching the approved mockup) built on
+// Stripe's separate Card Number / Expiry / CVC Elements, so the card, expiry, and CVC
+// each render in their own styled box instead of one combined field. Card details are
+// typed directly into Stripe's own secure iframes -- this component and this app's
+// server never see the raw number, expiry, or CVC, only Stripe's reported card brand
+// and completion state, which is why the "live" card preview can't mirror the typed
+// digits: Stripe deliberately never hands those back to page JavaScript.
 function CheckoutFlow({ onBack }) {
-  const [step, setStep] = useState('email'); // 'email' | 'payment' | 'success'
   const [email, setEmail] = useState('');
+  const [cardName, setCardName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const clientSecretRef = useRef(null);
-  const stripeRef = useRef(null);
-  const cardElementRef = useRef(null);
-  const mountRef = useRef(null);
+  const [success, setSuccess] = useState(false);
+  const [cardBrand, setCardBrand] = useState('');
+  const [flipped, setFlipped] = useState(false);
 
-  const handleContinue = async () => {
+  const stripeRef = useRef(null);
+  const numberElRef = useRef(null);
+  const expiryElRef = useRef(null);
+  const cvcElRef = useRef(null);
+  const numberMountRef = useRef(null);
+  const expiryMountRef = useRef(null);
+  const cvcMountRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const elementStyle = {
+      style: {
+        base: {
+          color: '#f3e9d8',
+          fontFamily: "'Source Sans 3', ui-sans-serif, system-ui",
+          fontSize: '14.5px',
+          '::placeholder': { color: '#696c80' },
+        },
+        invalid: { color: '#f0b199' },
+      },
+    };
+    (async () => {
+      const stripe = await getStripe();
+      if (cancelled || !numberMountRef.current) return;
+      const elements = stripe.elements();
+      const numberEl = elements.create('cardNumber', elementStyle);
+      const expiryEl = elements.create('cardExpiry', elementStyle);
+      const cvcEl = elements.create('cardCvc', elementStyle);
+      numberEl.mount(numberMountRef.current);
+      expiryEl.mount(expiryMountRef.current);
+      cvcEl.mount(cvcMountRef.current);
+      numberEl.on('change', (e) => setCardBrand(e.brand && e.brand !== 'unknown' ? e.brand : ''));
+      cvcEl.on('focus', () => setFlipped(true));
+      cvcEl.on('blur', () => setFlipped(false));
+      stripeRef.current = stripe;
+      numberElRef.current = numberEl;
+      expiryElRef.current = expiryEl;
+      cvcElRef.current = cvcEl;
+    })();
+    return () => {
+      cancelled = true;
+      [numberElRef, expiryElRef, cvcElRef].forEach((ref) => {
+        if (ref.current) {
+          ref.current.unmount();
+          ref.current = null;
+        }
+      });
+    };
+  }, []);
+
+  const handlePay = async () => {
     setError('');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    const trimmedEmail = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       return setError('Enter a valid email address.');
     }
+    if (!stripeRef.current || !numberElRef.current) return;
     setBusy(true);
     try {
       const res = await fetch(CREATE_PAYMENT_INTENT_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: trimmedEmail }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not start checkout.');
-      clientSecretRef.current = data.clientSecret;
-      setStep('payment');
-    } catch (e) {
-      setError(e.message || 'Could not start checkout.');
-    } finally {
-      setBusy(false);
-    }
-  };
 
-  // Mounts a plain Card Element once the payment step's container div
-  // exists. Deliberately the classic single-purpose Card Element, not the
-  // unified Payment Element -- the latter pulls in Klarna/Bank/Cash App Pay
-  // suggestions from this Stripe account's dashboard-level payment method
-  // settings regardless of the payment_method_types this app requests, and
-  // all of those need a redirect-and-return this single-page checkout
-  // doesn't handle. The Card Element only ever renders card fields.
-  // Unmounts on cleanup so re-entering checkout (via Back, then Continue
-  // again) never stacks a second element on top of the first.
-  useEffect(() => {
-    if (step !== 'payment' || !mountRef.current) return;
-    let cancelled = false;
-    (async () => {
-      const stripe = await getStripe();
-      if (cancelled) return;
-      const elements = stripe.elements();
-      const cardElement = elements.create('card', {
-        style: {
-          base: {
-            color: '#f3e9d8',
-            fontFamily: "'Source Sans 3', ui-sans-serif, system-ui",
-            fontSize: '16px',
-            '::placeholder': { color: '#696c80' },
-          },
-          invalid: { color: '#f0b199' },
-        },
-      });
-      cardElement.mount(mountRef.current);
-      stripeRef.current = stripe;
-      cardElementRef.current = cardElement;
-    })();
-    return () => {
-      cancelled = true;
-      if (cardElementRef.current) {
-        cardElementRef.current.unmount();
-        cardElementRef.current = null;
-      }
-    };
-  }, [step]);
+      const billingDetails = { email: trimmedEmail };
+      if (cardName.trim()) billingDetails.name = cardName.trim();
 
-  const handlePay = async () => {
-    setError('');
-    if (!stripeRef.current || !cardElementRef.current) return;
-    setBusy(true);
-    try {
       const { error: confirmError, paymentIntent } = await stripeRef.current.confirmCardPayment(
-        clientSecretRef.current,
-        { payment_method: { card: cardElementRef.current } }
+        data.clientSecret,
+        { payment_method: { card: numberElRef.current, billing_details: billingDetails } }
       );
       if (confirmError) throw new Error(confirmError.message || 'Payment failed.');
       if (paymentIntent && paymentIntent.status === 'succeeded') {
-        setStep('success');
+        setSuccess(true);
       } else {
         throw new Error('Payment did not complete.');
       }
     } catch (e) {
-      setError(e.message || 'Payment failed.');
+      setError(e.message || 'Something went wrong.');
     } finally {
       setBusy(false);
     }
   };
 
-  if (step === 'success') {
-    return (
-      <div className="text-center">
-        <p className="font-serif text-lg mb-3" style={{ color: '#f3e9d8' }}>Payment received</p>
-        <p className="text-sm" style={{ color: '#a6a9bd' }}>
-          Check your inbox at <span style={{ color: '#e8dbc3' }}>{email.trim()}</span> for your access link to finish setting up your account.
-        </p>
-      </div>
-    );
-  }
-
-  if (step === 'payment') {
-    return (
-      <div>
-        <AuthError message={error} />
-        <div ref={mountRef} className="mb-6" style={{ ...inputStyle, background: '#131b46', border: '1px solid #283268', padding: '12px' }} />
-        <AuthButton onClick={handlePay} disabled={busy}>
-          {busy ? 'Processing…' : 'Pay $2.99'}
-        </AuthButton>
-        <button onClick={onBack} className="w-full text-center text-sm mt-4" style={{ color: '#c9a227' }}>
-          Back
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <AuthError message={error} />
-      <p className="text-center text-sm mb-6" style={{ color: '#a6a9bd' }}>
-        $2.99, once. Your journal is yours to keep, synced across every device.
-      </p>
-      <div className="mb-6">
-        <Field label="Email">
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            autoCapitalize="none"
-            placeholder="you@example.com"
-            style={inputStyle}
-          />
-        </Field>
+    <div className="th-mkt">
+      <GlobalStyles />
+      <MarketingStyles />
+      <div className="th-checkout-wrap">
+        <div className="topbar">
+          <div className="brand">
+            <div className="medallion"><span>TH</span></div>
+            <div className="topbar-name">True Herf Cigar Journal<small>Checkout</small></div>
+          </div>
+          <button className="back-link" onClick={onBack}>← Back</button>
+        </div>
+
+        <div className="stage">
+          <div className="card-col">
+            <div className="card-eyebrow">Live preview</div>
+            <div className="card3d">
+              <div className={`card3d-inner${flipped ? ' flipped' : ''}`}>
+                <div className="face face-front">
+                  <div className="card-row-top">
+                    <div className="chip"></div>
+                    <div className="network"><div className="c1"></div><div className="c2"></div></div>
+                  </div>
+                  <div>
+                    <div className="card-number placeholder">•••• •••• •••• ••••</div>
+                    <div className="card-bottom-row">
+                      <div>
+                        <div className="card-expiry"><span className="lbl">Cardholder</span></div>
+                        <div className={`card-name${cardName.trim() ? '' : ' placeholder'}`}>
+                          {cardName.trim() ? cardName.trim().toUpperCase() : 'YOUR NAME'}
+                        </div>
+                      </div>
+                      <div className="card-expiry">
+                        <span className="lbl">{cardBrand ? cardBrand.toUpperCase() : 'Expires'}</span>
+                        {!cardBrand && 'MM/YY'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="face face-back">
+                  <div className="mag-stripe"></div>
+                  <div className="cvc-strip"><div className="cvc-box">•••</div></div>
+                  <div className="back-note">Card details are typed straight into Stripe's own secure fields. Neither this page nor True Herf's server ever sees your card number, expiry, or CVC.</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="trust-row">
+              <div className="item"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2.2"><rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 018 0v3" /></svg> Card details go straight to Stripe, never to us</div>
+              <div className="item"><CheckIcon /> One-time charge, $2.99, nothing recurring</div>
+              <div className="item"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg> PCI-compliant by design, not by us</div>
+            </div>
+          </div>
+
+          <div className="form-col">
+            {!success ? (
+              <div>
+                <div className="form-head">
+                  <div>
+                    <h2>Unlock True Herf</h2>
+                    <p>One payment. Full access, forever.</p>
+                  </div>
+                  <div className="price-tag">
+                    <div className="amt">$2.99</div>
+                    <div className="lbl">one time</div>
+                  </div>
+                </div>
+
+                {error && <div className="th-error">{error}</div>}
+
+                <div className="th-field">
+                  <label>Email</label>
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="email"
+                    autoCapitalize="none"
+                    placeholder="you@email.com"
+                  />
+                </div>
+
+                <div className="th-field">
+                  <label>Name on card</label>
+                  <input
+                    value={cardName}
+                    onChange={(e) => setCardName(e.target.value)}
+                    type="text"
+                    placeholder="Ray Watson"
+                    autoComplete="cc-name"
+                  />
+                </div>
+
+                <div className="th-field">
+                  <label>Card number</label>
+                  <div className="elmnt" ref={numberMountRef} />
+                </div>
+
+                <div className="row3">
+                  <div></div>
+                  <div className="th-field">
+                    <label>Expiry</label>
+                    <div className="elmnt" ref={expiryMountRef} />
+                  </div>
+                  <div className="th-field">
+                    <label>CVC</label>
+                    <div className="elmnt" ref={cvcMountRef} />
+                  </div>
+                </div>
+
+                <div className="secure-note">
+                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.2"><rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 018 0v3" /></svg>
+                  The card number, expiry, and CVC fields above are Stripe's secure embedded fields.
+                </div>
+
+                <button className="pay-btn" onClick={handlePay} disabled={busy}>
+                  {busy && <span className="pay-spinner"></span>}
+                  <span>{busy ? 'Processing…' : 'Pay $2.99, get instant access'}</span>
+                </button>
+
+                <div className="cards-accepted">
+                  <div className="mini-card">VISA</div>
+                  <div className="mini-card">MC</div>
+                  <div className="mini-card">AMEX</div>
+                  <div className="mini-card">DISC</div>
+                </div>
+              </div>
+            ) : (
+              <div className="th-success">
+                <div className="check"><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" /></svg></div>
+                <h3>Thank you for joining True Herf</h3>
+                <p>Your journal is unlocked. We just sent you a direct access link to the email below. It drops you straight into account setup.</p>
+                <div className="mail-chip">{email.trim()}</div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-      <AuthButton onClick={handleContinue} disabled={busy}>
-        {busy ? 'Loading…' : 'Continue to Payment'}
-      </AuthButton>
-      <button onClick={onBack} className="w-full text-center text-sm mt-4" style={{ color: '#c9a227' }}>
-        Back
-      </button>
     </div>
   );
 }
@@ -2481,31 +3165,11 @@ function AuthFlow({ deviceId, claimToken, onAuthenticated }) {
   };
 
   if (mode === 'gate') {
-    return (
-      <AuthShell>
-        <p className="text-center text-sm mb-8" style={{ color: '#a6a9bd' }}>
-          Sign in to keep your journal with you across every device.
-        </p>
-        <div className="flex flex-col gap-3">
-          <AuthButton onClick={() => reset('checkout')}>Get Full Access — $2.99</AuthButton>
-          <button
-            onClick={() => reset('login')}
-            className="w-full py-3 rounded-lg font-semibold"
-            style={{ background: '#131b46', color: '#e8dbc3', border: '1px solid #c9a22755' }}
-          >
-            Log In
-          </button>
-        </div>
-      </AuthShell>
-    );
+    return <LandingPage onCheckout={() => reset('checkout')} onLogin={() => reset('login')} />;
   }
 
   if (mode === 'checkout') {
-    return (
-      <AuthShell>
-        <CheckoutFlow onBack={() => reset('gate')} />
-      </AuthShell>
-    );
+    return <CheckoutFlow onBack={() => reset('gate')} />;
   }
 
   if (mode === 'claim') {
