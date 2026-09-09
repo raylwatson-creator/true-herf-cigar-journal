@@ -1825,7 +1825,6 @@ function InfoChip({ label, value }) {
 }
 
 function StatsView({ entries, onOpenEntry }) {
-  const [selectedBrand, setSelectedBrand] = useState(null);
   const [calDate, setCalDate] = useState(() => {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
@@ -1838,18 +1837,22 @@ function StatsView({ entries, onOpenEntry }) {
 
   const avgRating = (entries.reduce((s, e) => s + e.rating, 0) / entries.length).toFixed(1);
 
-  const brandCounts = {};
-  entries.forEach((e) => { brandCounts[e.brand] = (brandCounts[e.brand] || 0) + 1; });
-  const topBrands = Object.entries(brandCounts)
+  // Top flavor notes — tallies every flavor tag tapped across all three thirds of every
+  // entry (a fixed 40-tag vocabulary from the flavor wheel, so counts group cleanly with
+  // no near-duplicate labels), then keeps the 5 most common. Replaces the old "Top brands"
+  // chart, which counted entries by brand name instead.
+  const flavorCounts = {};
+  entries.forEach((e) => {
+    ['first', 'second', 'final'].forEach((third) => {
+      (e.thirdsFlavors?.[third] || []).forEach((flavor) => {
+        flavorCounts[flavor] = (flavorCounts[flavor] || 0) + 1;
+      });
+    });
+  });
+  const topFlavors = Object.entries(flavorCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([name, count]) => ({ name, count }));
-
-  // Cigars logged under whichever brand bar was last tapped, newest first — shown in the
-  // "Cigars under this brand" card at the bottom of the page.
-  const brandEntries = selectedBrand
-    ? entries.filter((e) => e.brand === selectedBrand).sort((a, b) => b.date.localeCompare(a.date))
-    : [];
 
   const tooltipStyle = { fontSize: 12, borderRadius: 8, background: '#131b46', border: '1px solid #1b2455', color: '#f3e9d8' };
 
@@ -1894,20 +1897,14 @@ function StatsView({ entries, onOpenEntry }) {
       </div>
 
       <div className="p-4 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
-        <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>Top brands</div>
+        <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>Top flavor notes</div>
         <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={topBrands} margin={{ left: -20 }}>
+          <BarChart data={topFlavors} margin={{ left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#131a43" />
             <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#8d91a8' }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#8d91a8' }} />
             <Tooltip contentStyle={tooltipStyle} />
-            <Bar
-              dataKey="count"
-              fill="#b5652f"
-              radius={[4, 4, 0, 0]}
-              cursor="pointer"
-              onClick={(data) => setSelectedBrand(data.name)}
-            />
+            <Bar dataKey="count" fill="#b5652f" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -2015,44 +2012,6 @@ function StatsView({ entries, onOpenEntry }) {
         )}
       </div>
 
-      {selectedBrand && (
-        <div className="p-4 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#c9a227' }}>
-              {selectedBrand} ({brandEntries.length})
-            </div>
-            <button onClick={() => setSelectedBrand(null)} style={{ color: '#71758f' }}>
-              <X size={16} />
-            </button>
-          </div>
-          <div className="flex flex-col gap-3">
-            {brandEntries.map((e) => (
-              <button
-                key={e.id}
-                onClick={() => onOpenEntry(e.id)}
-                className="flex items-center gap-3 p-3 rounded-xl text-left btn-raised-sm"
-                style={{ background: '#131b46', border: '1px solid #131a43' }}
-              >
-                {e.photo ? (
-                  <img src={e.photo} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" style={{ border: '1px solid #131a43' }} />
-                ) : (
-                  <div className="w-14 h-14 rounded-lg shrink-0 flex items-center justify-center" style={{ background: '#0a0f2e' }}>
-                    <Camera size={18} style={{ color: '#696c80' }} />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="font-serif font-semibold truncate" style={{ color: '#f3e9d8', fontSize: 16 }}>
-                    {e.name || e.vitola || e.brand}
-                  </div>
-                  <div className="text-sm truncate" style={{ color: '#8d91a8' }}>{e.vitola}</div>
-                  <div className="text-xs mt-0.5" style={{ color: '#696c80' }}>{fmtDate(e.date)}</div>
-                </div>
-                <CigarBand rating={e.rating} size={44} />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
