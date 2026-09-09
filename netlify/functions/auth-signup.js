@@ -1,5 +1,5 @@
 import { getDatabase } from "@netlify/database";
-import { hashPin, signSession, EMAIL_RE, PIN_RE } from "./_lib/auth.js";
+import { hashPin, signSession, PIN_RE } from "./_lib/auth.js";
 
 const db = getDatabase();
 
@@ -14,38 +14,40 @@ export default async (req) => {
 
   try {
     const body = await req.json();
-    const email = (body.email || "").trim().toLowerCase();
+    const claimToken = (body.claimToken || "").trim();
     const pin = body.pin;
     const deviceId = body.deviceId || null;
 
-    if (!EMAIL_RE.test(email)) {
-      return json(400, { error: "Enter a valid email address." });
+    if (!claimToken) {
+      return json(400, { error: "Missing access link token." });
     }
     if (!PIN_RE.test(String(pin || ""))) {
       return json(400, { error: "PIN must be exactly 4 digits." });
     }
 
+    // Paywall gate: account creation is tied to possession of the claim
+    // token from the access-link email, not a submitted email address --
+    // that's what proves this is whoever actually received the link, not
+    // just anyone who knows the purchaser's email. This is the one and only
+    // place the purchase requirement is enforced -- it's a database lookup,
+    // not a client-side check, so there's no way to reach this by skipping
+    // the marketing/checkout page. Logging in (auth-login.js) is untouched
+    // and has no purchase check, so this only affects brand new accounts.
+    const [purchase] = await db.sql`
+      SELECT id, email FROM purchases
+      WHERE claim_token = ${claimToken} AND claimed_at IS NULL
+    `;
+    if (!purchase) {
+      return json(400, {
+        error: "This access link is invalid or has already been used.",
+      });
+    }
+
+    const email = purchase.email;
+
     const [existing] = await db.sql`SELECT id FROM users WHERE email = ${email}`;
     if (existing) {
       return json(409, { error: "An account with this email already exists." });
-    }
-
-    // Paywall gate: this email needs a completed, not-yet-used purchase on
-    // file before an account can be created. This is the one and only place
-    // the purchase requirement is enforced -- it's a database lookup, not a
-    // client-side check, so there's no way to reach this by skipping the
-    // marketing/checkout page. Logging in (auth-login.js) is untouched and
-    // has no purchase check, so this only affects brand new accounts.
-    const [purchase] = await db.sql`
-      SELECT id FROM purchases
-      WHERE email = ${email} AND claimed_at IS NULL
-      ORDER BY created_at ASC
-      LIMIT 1
-    `;
-    if (!purchase) {
-      return json(402, {
-        error: "We don't see a completed purchase for this email yet. Please buy access first, then create your account.",
-      });
     }
 
     const pinHash = hashPin(pin);
