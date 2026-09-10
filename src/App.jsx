@@ -2587,7 +2587,10 @@ function LandingPage({ onCheckout, onLogin }) {
         </div>
         <div className="wrap">
           <div className="video-box">
-            <video src="/th-demo-walkthrough.mp4" controls playsInline muted autoPlay loop preload="auto" />
+            <video controls playsInline muted autoPlay loop preload="auto">
+              <source src="/th-demo-walkthrough.webm" type="video/webm" />
+              <source src="/th-demo-walkthrough.mp4" type="video/mp4" />
+            </video>
           </div>
         </div>
       </section>
