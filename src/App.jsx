@@ -2519,7 +2519,7 @@ const FEATURES = [
   { path: 'M12 17.3l-5.4 3 1.4-6-4.7-4 6.1-.5L12 4l2.6 5.8 6.1.5-4.7 4 1.4 6z', title: 'Half-star ratings', body: 'Rate with real precision: tap the left or right half of any star, down to the 0.5.' },
   { path: 'M12 3v18M3 12h18', title: 'Flavor wheel, by the thirds', body: 'Separate tasting notes for the first, second, and final third, each with its own 10-category flavor wheel.', circle: true },
   { path: 'M3 9h18M8 2v4M16 2v4', title: 'Cigar Calendar', body: 'Every logged day shows the cigar itself, right on the calendar. Tap in to relive it.', rect: true },
-  { path: 'M7 15l4-4 3 3 5-6', title: 'Your stats', body: "Average rating, top brands, and a full drill-down into every cigar you've logged under any brand.", frame: true },
+  { path: 'M7 15l4-4 3 3 5-6', title: 'Your stats', body: "Average rating, your top flavor notes, and a full Cigar Calendar of everything you've logged.", frame: true },
   { path: 'M12 3v12M8 8l4-5 4 5M5 21h14', title: 'Share an entry', body: 'Download any cigar as a beautiful shareable card: photo, rating, and notes, ready to post.' },
 ];
 
@@ -2690,7 +2690,7 @@ function LandingPage({ onCheckout, onLogin }) {
             <ul className="price-list">
               <li><CheckIcon /> Unlimited cigars, forever</li>
               <li><CheckIcon /> Full flavor wheel &amp; tasting notes by the thirds</li>
-              <li><CheckIcon /> Stats, Cigar Calendar &amp; brand drill-downs</li>
+              <li><CheckIcon /> Stats, Cigar Calendar &amp; top flavor notes</li>
               <li><CheckIcon /> Built-in vitola &amp; wrapper guide</li>
               <li><CheckIcon /> Shareable entry cards</li>
               <li><CheckIcon /> Your data, synced &amp; private, never sold</li>
