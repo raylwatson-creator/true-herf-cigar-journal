@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, Search, Camera, ChevronLeft, ChevronRight, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star, List, LayoutGrid } from 'lucide-react';
+import { Plus, Search, Camera, ChevronLeft, ChevronRight, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star, List, LayoutGrid, Share2, MoreVertical, Check, Smartphone } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 
 const ENTRIES_API = '/.netlify/functions/entries';
@@ -2534,6 +2534,77 @@ function FeatureIcon({ f }) {
   );
 }
 
+function InstallSection() {
+  const [platform, setPlatform] = React.useState('ios');
+  return (
+    <section className="px-6 py-10 max-w-md mx-auto">
+      <div className="text-center text-xs tracking-widest text-[#C9A227] font-mono mb-2">GET IT ON YOUR PHONE</div>
+      <h2 className="text-center font-serif text-2xl font-semibold text-[#F3E9D8] mb-3">Install it like an app.<br/>No store needed.</h2>
+      <p className="text-center text-sm text-[#8D91A8] max-w-sm mx-auto mb-6 leading-relaxed">
+        True Herf installs straight from your browser and lives on your home screen with its own icon, full screen, no address bar. Takes about ten seconds.
+      </p>
+      <div className="bg-[#131B46] border border-[#283268] rounded-xl p-5 max-w-sm mx-auto">
+        <div className="flex bg-black/30 border border-[#283268] rounded-lg p-1 mb-5">
+          <button
+            type="button"
+            onClick={() => setPlatform('ios')}
+            className={`flex-1 text-center py-2 rounded-md text-sm font-bold transition ${
+              platform === 'ios'
+                ? 'bg-gradient-to-b from-[#B5652F] to-[#8A4F24] text-white shadow'
+                : 'text-[#8D91A8]'
+            }`}
+          >
+            iPhone
+          </button>
+          <button
+            type="button"
+            onClick={() => setPlatform('android')}
+            className={`flex-1 text-center py-2 rounded-md text-sm font-bold transition ${
+              platform === 'android'
+                ? 'bg-gradient-to-b from-[#B5652F] to-[#8A4F24] text-white shadow'
+                : 'text-[#8D91A8]'
+            }`}
+          >
+            Android
+          </button>
+        </div>
+
+        {platform === 'ios' ? (
+          <div className="flex flex-col gap-4">
+            <InstallStep icon={<Share2 size={16} />} title='Tap the Share icon' body="It's the square with an arrow pointing up, in Safari's toolbar." />
+            <InstallStep icon={<MoreVertical size={16} />} title='Scroll down and tap "Add to Home Screen"' body="It's a bit further down the share sheet." />
+            <InstallStep icon={<Check size={16} />} title='Tap "Add" in the top right' body="True Herf now sits on your home screen like any other app." />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <InstallStep icon={<MoreVertical size={16} />} title='Tap the menu icon' body="The three dots in the top right of Chrome's toolbar." />
+            <InstallStep icon={<Smartphone size={16} />} title='Tap "Add to Home screen"' body='Or tap "Install app" if Chrome already offered it to you.' />
+            <InstallStep icon={<Check size={16} />} title='Tap "Add" or "Install" to confirm' body="True Herf now sits on your home screen like any other app." />
+          </div>
+        )}
+
+        <div className="mt-4 pt-4 border-t border-[#283268] text-center text-xs text-[#696C80] leading-relaxed">
+          Already installed it? Just tap the icon to open your journal, no need to log in through the browser again.
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function InstallStep({ icon, title, body }) {
+  return (
+    <div className="flex gap-3 items-start">
+      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#C9A227]/15 border border-[#C9A227]/40 flex items-center justify-center text-[#E4C556]">
+        {icon}
+      </div>
+      <div>
+        <div className="text-[#F3E9D8] text-sm font-semibold mb-0.5">{title}</div>
+        <div className="text-[#8D91A8] text-[13px] leading-relaxed">{body}</div>
+      </div>
+    </div>
+  );
+}
+
 // The real marketing/paywall front door. Only ever rendered for a brand new or
 // signed-out visitor -- App() checks getStoredAuth() before this component exists,
 // so a returning member with a valid session never sees it at all.
@@ -2726,6 +2797,8 @@ function LandingPage({ onCheckout, onLogin }) {
         </div>
       </section>
 
+      <InstallSection />
+
       <section id="faq">
         <div className="wrap">
           <div className="section-head">
@@ -2739,7 +2812,7 @@ function LandingPage({ onCheckout, onLogin }) {
             </details>
             <details>
               <summary>Do I need to download this from an app store?</summary>
-              <p>No. It installs right from your browser. Tap "Add to Home Screen" and it works just like any other app on your phone, no App Store or Play Store required.</p>
+              <p>No. It installs right from your browser, see "Get it on your phone" above for the exact steps, no App Store or Play Store required.</p>
             </details>
             <details>
               <summary>What if I lose my access link?</summary>

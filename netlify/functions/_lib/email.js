@@ -125,6 +125,32 @@ export function accessEmailHtml({ accessLink, orderNumber, amount, date }) {
                 </tr>
 
                 <tr>
+                  <td>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto 26px;background:#131B46;border:1px solid #283268;border-radius:10px;">
+                      <tr>
+                        <td style="padding:18px 20px;">
+                          <div style="font-family:Georgia,serif;color:#E4C556;font-size:14.5px;font-weight:600;margin:0 0 12px;text-align:left;">One more thing: install it</div>
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                            <tr>
+                              <td style="width:62px;vertical-align:top;padding-bottom:10px;font-family:'Courier New',monospace;font-size:11px;color:#C9A227;">IPHONE</td>
+                              <td style="vertical-align:top;padding-bottom:10px;font-family:Arial,sans-serif;font-size:13px;color:#E8DBC3;line-height:1.55;">In Safari, tap the <strong style="color:#F3E9D8;">Share</strong> icon, then <strong style="color:#F3E9D8;">Add to Home Screen</strong>.</td>
+                            </tr>
+                            <tr>
+                              <td style="width:62px;vertical-align:top;padding-bottom:10px;font-family:'Courier New',monospace;font-size:11px;color:#C9A227;">ANDROID</td>
+                              <td style="vertical-align:top;padding-bottom:10px;font-family:Arial,sans-serif;font-size:13px;color:#E8DBC3;line-height:1.55;">In Chrome, tap the <strong style="color:#F3E9D8;">menu (&#8942;)</strong>, then <strong style="color:#F3E9D8;">Add to Home screen</strong>.</td>
+                            </tr>
+                            <tr>
+                              <td style="width:62px;"></td>
+                              <td style="font-family:Arial,sans-serif;font-size:13px;color:#E8DBC3;line-height:1.55;">No app store needed, and you can always do this later from inside the app.</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <tr>
                   <td align="center" style="font-family:Arial,Helvetica,sans-serif; font-size:11.5px; color:#696C80; padding-bottom:8px;">
                     Or copy and paste this link into your browser:
                   </td>
