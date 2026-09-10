@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>True Herf — Admin</title>
+<style>
+  :root {
+    --navy: #0A0F2E;
+    --navy-deep: #06091A;
+    --panel: #131B46;
+    --border: #283268;
+    --gold: #C9A227;
+    --cream: #F3E9D8;
+    --muted: #8D91A8;
+    --copper: #B5652F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 16px 60px;
+    background: var(--navy-deep);
+    color: var(--cream);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin: 0 0 4px;
+    color: var(--gold);
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin: 0 0 24px;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .gate {
+    max-width: 360px;
+    margin: 80px auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    text-align: center;
+  }
+  .gate h1 { margin-bottom: 16px; }
+  input[type="password"] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--navy);
+    color: var(--cream);
+    font-size: 1rem;
+    margin-bottom: 12px;
+  }
+  button {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: none;
+    background: var(--copper);
+    color: var(--cream);
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  button:hover { opacity: 0.9; }
+  .error {
+    color: #E8A0A0;
+    font-size: 0.85rem;
+    margin-top: 10px;
+    min-height: 1em;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .stat .num {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--gold);
+    font-family: "SF Mono", "JetBrains Mono", monospace;
+  }
+  .stat .label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  section h2 {
+    font-size: 0.95rem;
+    color: var(--gold);
+    margin: 0 0 12px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+  .empty {
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+  .refresh {
+    display: inline-block;
+    margin-bottom: 20px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: auto;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+  }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+  <div id="gate" class="gate">
+    <h1>True Herf — Admin</h1>
+    <input type="password" id="pw" placeholder="Password" autocomplete="off" />
+    <button id="unlockBtn">Unlock</button>
+    <div class="error" id="gateError"></div>
+  </div>
+
+  <div id="dashboard" class="wrap" hidden>
+    <h1>True Herf — Admin</h1>
+    <p class="sub" id="generatedAt"></p>
+    <button class="refresh" id="refreshBtn">Refresh</button>
+
+    <div class="grid">
+      <div class="stat"><div class="num" id="statUsers">–</div><div class="label">Total users</div></div>
+      <div class="stat"><div class="num" id="statActive">–</div><div class="label">Active (30 days)</div></div>
+      <div class="stat"><div class="num" id="statPurchases">–</div><div class="label">Total purchases</div></div>
+      <div class="stat"><div class="num" id="statUnclaimed">–</div><div class="label">Unclaimed purchases</div></div>
+      <div class="stat"><div class="num" id="statRevenue">–</div><div class="label">Total revenue</div></div>
+    </div>
+
+    <section>
+      <h2>Recent signups</h2>
+      <table id="signupsTable">
+        <thead><tr><th>Email</th><th>Created</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="signupsEmpty" hidden>No signups yet.</div>
+    </section>
+
+    <section>
+      <h2>Unclaimed purchases</h2>
+      <p class="sub" style="margin-bottom:8px;">Paid but never finished creating an account — worth following up.</p>
+      <table id="unclaimedTable">
+        <thead><tr><th>Email</th><th>Order #</th><th>Paid</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="unclaimedEmpty" hidden>None — everyone who paid has an account.</div>
+    </section>
+
+    <div class="error" id="dashError"></div>
+  </div>
+
+<script>
+(function () {
+  var STATS_API = '/.netlify/functions/admin-stats';
+  var pwField = document.getElementById('pw');
+  var gate = document.getElementById('gate');
+  var dashboard = document.getElementById('dashboard');
+  var gateError = document.getElementById('gateError');
+  var dashError = document.getElementById('dashError');
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function fmtMoney(cents) {
+    return '$' + (cents / 100).toFixed(2);
+  }
+
+  function fillTable(bodyId, emptyId, rows, renderRow) {
+    var tbody = document.querySelector('#' + bodyId + ' tbody');
+    var empty = document.getElementById(emptyId);
+    tbody.innerHTML = '';
+    if (!rows || rows.length === 0) {
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+    rows.forEach(function (row) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = renderRow(row);
+      tbody.appendChild(tr);
+    });
+  }
+
+  function render(data) {
+    document.getElementById('statUsers').textContent = data.totalUsers;
+    document.getElementById('statActive').textContent = data.activeUsers30d;
+    document.getElementById('statPurchases').textContent = data.totalPurchases;
+    document.getElementById('statUnclaimed').textContent = data.unclaimedPurchases;
+    document.getElementById('statRevenue').textContent = fmtMoney(data.revenueCents);
+    document.getElementById('generatedAt').textContent =
+      'Updated ' + new Date(data.generatedAt).toLocaleString();
+
+    fillTable('signupsTable', 'signupsEmpty', data.recentSignups, function (row) {
+      return '<td>' + escapeHtml(row.email) + '</td><td>' + fmtDate(row.created_at) + '</td>';
+    });
+
+    fillTable('unclaimedTable', 'unclaimedEmpty', data.unclaimedPurchasesList, function (row) {
+      return '<td>' + escapeHtml(row.email) + '</td><td>' + escapeHtml(row.order_number) + '</td><td>' + fmtDate(row.created_at) + '</td>';
+    });
+  }
+
+  function escapeHtml(s) {
+    var div = document.createElement('div');
+    div.textContent = s == null ? '' : String(s);
+    return div.innerHTML;
+  }
+
+  function loadStats(password) {
+    dashError.textContent = '';
+    return fetch(STATS_API, {
+      headers: { 'x-admin-password': password },
+    }).then(function (res) {
+      if (res.status === 401) {
+        throw new Error('WRONG_PASSWORD');
+      }
+      if (!res.ok) {
+        throw new Error('Something went wrong loading stats (status ' + res.status + ').');
+      }
+      return res.json();
+    });
+  }
+
+  function tryUnlock(password) {
+    gateError.textContent = '';
+    return loadStats(password).then(function (data) {
+      try { sessionStorage.setItem('th_admin_pw', password); } catch (e) {}
+      gate.hidden = true;
+      dashboard.hidden = false;
+      render(data);
+    }).catch(function (err) {
+      if (err.message === 'WRONG_PASSWORD') {
+        gateError.textContent = 'Incorrect password.';
+      } else {
+        gateError.textContent = err.message;
+      }
+      try { sessionStorage.removeItem('th_admin_pw'); } catch (e) {}
+    });
+  }
+
+  document.getElementById('unlockBtn').addEventListener('click', function () {
+    tryUnlock(pwField.value);
+  });
+  pwField.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') tryUnlock(pwField.value);
+  });
+
+  document.getElementById('refreshBtn').addEventListener('click', function () {
+    var pw = null;
+    try { pw = sessionStorage.getItem('th_admin_pw'); } catch (e) {}
+    if (!pw) {
+      dashboard.hidden = true;
+      gate.hidden = false;
+      return;
+    }
+    loadStats(pw).then(render).catch(function (err) {
+      dashError.textContent = err.message === 'WRONG_PASSWORD' ? 'Session expired, please re-enter the password.' : err.message;
+      if (err.message === 'WRONG_PASSWORD') {
+        dashboard.hidden = true;
+        gate.hidden = false;
+      }
+    });
+  });
+
+  // Auto-unlock if this tab already has the password from earlier this session.
+  (function () {
+    var pw = null;
+    try { pw = sessionStorage.getItem('th_admin_pw'); } catch (e) {}
+    if (pw) tryUnlock(pw);
+  })();
+})();
+</script>
+</body>
+</html>
