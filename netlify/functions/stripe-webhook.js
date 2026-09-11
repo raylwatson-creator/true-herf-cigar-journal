@@ -96,7 +96,7 @@ export default async (req) => {
     });
   } catch (e) {
     console.error("Webhook handler error:", e);
-    return new Response(JSON.stringify({ error: String(e && e.message ? e.message : e) }), {
+    return new Response(JSON.stringify({ error: "Something went wrong." }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });

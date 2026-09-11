@@ -11,6 +11,17 @@ const json = (statusCode, body) =>
 
 const rowToEntry = (row) => ({ id: row.id, ...row.data });
 
+// Basic shape/size guard -- an account can only ever affect its own rows
+// (every query below is scoped to user_id), so this is hygiene against
+// accidental storage bloat or a malformed client payload, not a
+// cross-user risk.
+const MAX_ENTRY_BYTES = 2_000_000; // 2MB, comfortably above a real entry with a compressed photo
+function entryProblem(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return "entry required";
+  if (JSON.stringify(entry).length > MAX_ENTRY_BYTES) return "entry is too large";
+  return null;
+}
+
 export default async (req) => {
   const session = verifySession(getBearerToken(req));
   if (!session) return json(401, { error: "Not signed in." });
@@ -31,7 +42,8 @@ export default async (req) => {
     if (method === "POST") {
       const body = await req.json();
       const { entry } = body;
-      if (!entry) return json(400, { error: "entry required" });
+      const problem = entryProblem(entry);
+      if (problem) return json(400, { error: problem });
 
       const [row] = await db.sql`
         INSERT INTO entries (user_id, data)
@@ -44,7 +56,9 @@ export default async (req) => {
     if (method === "PUT") {
       const body = await req.json();
       const { id, entry } = body;
-      if (!id || !entry) return json(400, { error: "id and entry required" });
+      if (!id) return json(400, { error: "id and entry required" });
+      const problem = entryProblem(entry);
+      if (problem) return json(400, { error: problem });
 
       const [row] = await db.sql`
         UPDATE entries
@@ -69,6 +83,7 @@ export default async (req) => {
 
     return json(405, { error: "method not allowed" });
   } catch (e) {
-    return json(500, { error: String(e && e.message ? e.message : e) });
+    console.error("entries error:", e);
+    return json(500, { error: "Something went wrong. Please try again." });
   }
 };

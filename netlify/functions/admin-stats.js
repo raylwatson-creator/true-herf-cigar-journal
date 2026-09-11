@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { getDatabase } from "@netlify/database";
 
 const db = getDatabase();
@@ -7,6 +8,28 @@ const json = (statusCode, body) =>
     status: statusCode,
     headers: { "Content-Type": "application/json" },
   });
+
+// Hashing both sides to a fixed-length digest before comparing means
+// crypto.timingSafeEqual can be used even though the submitted password and
+// the real one aren't the same length -- timingSafeEqual requires equal-
+// length buffers, and comparing raw strings with !== leaks timing
+// information proportional to how many leading characters match.
+function passwordsMatch(a, b) {
+  const ah = crypto.createHash("sha256").update(String(a)).digest();
+  const bh = crypto.createHash("sha256").update(String(b)).digest();
+  return crypto.timingSafeEqual(ah, bh);
+}
+
+const MAX_ADMIN_ATTEMPTS = 5;
+const ADMIN_LOCKOUT_MINUTES = 15;
+
+function getClientIp(req) {
+  return (
+    req.headers.get("x-nf-client-connection-ip") ||
+    (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
+    "unknown"
+  );
+}
 
 // Internal-only stats endpoint for the standalone admin page (public/admin.html).
 // Not linked from anywhere in the customer-facing app. Gated by a shared
@@ -18,9 +41,38 @@ export default async (req) => {
 
   const providedPassword = req.headers.get("x-admin-password") || "";
   const adminPassword = process.env.ADMIN_PASSWORD || "";
+  const ip = getClientIp(req);
 
-  if (!adminPassword || providedPassword !== adminPassword) {
-    return json(401, { error: "Unauthorized" });
+  try {
+    // Locked out by IP, not globally -- so someone hammering wrong
+    // passwords from elsewhere can't lock Ray out of his own admin page.
+    const [attemptRow] = await db.sql`
+      SELECT attempts, locked_until FROM admin_login_attempts WHERE ip = ${ip}
+    `;
+    if (attemptRow?.locked_until && new Date(attemptRow.locked_until) > new Date()) {
+      return json(429, { error: "Too many attempts. Try again in a few minutes." });
+    }
+
+    if (!adminPassword || !passwordsMatch(providedPassword, adminPassword)) {
+      const attempts = (attemptRow?.attempts || 0) + 1;
+      const lockedNow = attempts >= MAX_ADMIN_ATTEMPTS;
+      const lockedUntil = lockedNow
+        ? new Date(Date.now() + ADMIN_LOCKOUT_MINUTES * 60 * 1000).toISOString()
+        : null;
+      await db.sql`
+        INSERT INTO admin_login_attempts (ip, attempts, locked_until)
+        VALUES (${ip}, ${attempts}, ${lockedUntil})
+        ON CONFLICT (ip) DO UPDATE
+          SET attempts = ${attempts}, locked_until = ${lockedUntil}
+      `;
+      return json(401, { error: "Unauthorized" });
+    }
+
+    // Correct password -- clear this IP's attempt count.
+    await db.sql`DELETE FROM admin_login_attempts WHERE ip = ${ip}`;
+  } catch (e) {
+    console.error("admin-stats auth check error:", e);
+    return json(500, { error: "Something went wrong. Please try again." });
   }
 
   try {
@@ -66,6 +118,7 @@ export default async (req) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (e) {
-    return json(500, { error: String(e && e.message ? e.message : e) });
+    console.error("admin-stats error:", e);
+    return json(500, { error: "Something went wrong. Please try again." });
   }
 };

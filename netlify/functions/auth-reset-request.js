@@ -60,6 +60,7 @@ export default async (req) => {
 
     return json(200, GENERIC_OK);
   } catch (e) {
-    return json(500, { error: String(e && e.message ? e.message : e) });
+    console.error("auth-reset-request error:", e);
+    return json(500, { error: "Something went wrong. Please try again." });
   }
 };

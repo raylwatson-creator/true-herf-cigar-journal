@@ -68,6 +68,7 @@ export default async (req) => {
     const token = signSession(user.id);
     return json(200, { token, email });
   } catch (e) {
-    return json(500, { error: String(e && e.message ? e.message : e) });
+    console.error("auth-login error:", e);
+    return json(500, { error: "Something went wrong. Please try again." });
   }
 };

@@ -52,6 +52,7 @@ export default async (req) => {
 
     return json(200, { deleted: true });
   } catch (e) {
-    return json(500, { error: String(e && e.message ? e.message : e) });
+    console.error("delete-account error:", e);
+    return json(500, { error: "Something went wrong. Please try again." });
   }
 };
