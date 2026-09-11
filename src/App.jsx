@@ -10,6 +10,8 @@ const DEVICE_ID_KEY = 'cigar-device-id';
 const VIEW_MODE_KEY = 'cigar-list-view-mode';
 const AUTH_TOKEN_KEY = 'cigar-auth-token';
 const AUTH_EMAIL_KEY = 'cigar-auth-email';
+const AGE_VERIFIED_KEY = 'cigar-age-verified';
+const MIN_AGE = 21;
 const SIGNUP_API = '/.netlify/functions/auth-signup';
 const LOGIN_API = '/.netlify/functions/auth-login';
 const RESET_REQUEST_API = '/.netlify/functions/auth-reset-request';
@@ -51,6 +53,29 @@ function clearStoredAuth() {
     window.localStorage.removeItem(AUTH_TOKEN_KEY);
     window.localStorage.removeItem(AUTH_EMAIL_KEY);
   } catch (e) {}
+}
+
+// Age verification is a one-time, self-attested check, not real ID
+// verification -- that's the standard approach for a product like this.
+// It's deliberately client-side only: there's nothing server-side worth
+// protecting here, so a signed backend check would add complexity without
+// adding any real assurance. Persisted per browser so it only asks once;
+// it's never shown at all to anyone who already has a stored auth token
+// (see App()), so existing accounts are completely unaffected by it.
+function getAgeVerified() {
+  try {
+    return window.localStorage.getItem(AGE_VERIFIED_KEY) === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+function storeAgeVerified() {
+  try {
+    window.localStorage.setItem(AGE_VERIFIED_KEY, 'true');
+  } catch (e) {
+    // localStorage unavailable — the check will just run again next load
+  }
 }
 
 function getDeviceId() {
@@ -3481,9 +3506,163 @@ function AuthFlow({ deviceId, claimToken, onAuthenticated }) {
   );
 }
 
+const DOB_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const dobFieldStyle = {
+  padding: '13px 8px',
+  borderRadius: 10,
+  border: '1px solid #3a3550',
+  background: '#12183a',
+  color: '#f3e9d8',
+  fontSize: 15,
+  fontFamily: "'Source Sans 3', sans-serif",
+  textAlign: 'center',
+  letterSpacing: '0.02em',
+  outline: 'none',
+};
+
+// Gates the entire signed-out experience -- the marketing page, checkout,
+// login, and signup -- behind a one-time date-of-birth check. See
+// getAgeVerified/storeAgeVerified above for why this is self-attestation
+// only and lives entirely on the client.
+function AgeGate({ onVerified }) {
+  const [blocked, setBlocked] = useState(false);
+  const [day, setDay] = useState('');
+  const [month, setMonth] = useState('');
+  const [year, setYear] = useState('');
+  const [error, setError] = useState('');
+
+  const handleContinue = () => {
+    const d = Number(day);
+    const m = Number(month);
+    const yearRaw = year.trim();
+    const y = Number(yearRaw);
+    const thisYear = new Date().getFullYear();
+
+    const validDate =
+      d >= 1 && d <= 31 &&
+      m >= 1 && m <= 12 &&
+      yearRaw.length === 4 && y >= 1900 && y <= thisYear;
+
+    if (!validDate) {
+      setError('Please enter a valid date of birth.');
+      return;
+    }
+
+    const dob = new Date(y, m - 1, d);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const hadBirthdayThisYear =
+      today.getMonth() > dob.getMonth() ||
+      (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+    if (!hadBirthdayThisYear) age -= 1;
+
+    if (age < MIN_AGE) {
+      setError('');
+      setBlocked(true);
+      return;
+    }
+
+    setError('');
+    storeAgeVerified();
+    onVerified();
+  };
+
+  if (blocked) {
+    return (
+      <AuthShell>
+        <div style={{
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'rgba(240,80,80,0.10)', border: '1px solid rgba(240,120,90,0.30)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 22px', fontSize: 22, color: '#f0a3a3',
+        }}>
+          ✕
+        </div>
+        <div className="font-serif text-center" style={{ fontSize: 24, color: '#f6ecd9', marginBottom: 14, lineHeight: 1.25 }}>
+          Sorry, this app isn't available to you
+        </div>
+        <p className="text-center" style={{ fontSize: 14.5, lineHeight: 1.6, color: '#a6a9bd', marginBottom: 8 }}>
+          True Herf Cigar Journal is intended for adults {MIN_AGE} and older. Come back once you meet the age requirement.
+        </p>
+        <div className="text-center">
+          <a
+            href="https://www.google.com"
+            style={{ display: 'inline-block', marginTop: 12, fontSize: 13.5, color: '#7a7e99', textDecoration: 'underline' }}
+          >
+            Exit
+          </a>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  return (
+    <AuthShell>
+      <div style={{
+        width: 52, height: 52, borderRadius: '50%',
+        background: 'radial-gradient(circle at 35% 30%, #e4c34a, #c9a227 55%, #8a6f16 100%)',
+        border: '1.5px solid #7a5f12',
+        boxShadow: '0 2px 6px rgba(0,0,0,.5), inset 0 1px 1px rgba(255,255,255,.4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        margin: '0 auto 22px',
+      }}>
+        <span style={{ font: '900 17px "Fraunces", serif', color: '#2a1f04', letterSpacing: '0.02em' }}>TH</span>
+      </div>
+
+      <div className="font-serif text-center" style={{ fontSize: 24, color: '#f6ecd9', marginBottom: 14, lineHeight: 1.25 }}>
+        Enter your date of birth to continue
+      </div>
+      <p className="text-center" style={{ fontSize: 14.5, lineHeight: 1.6, color: '#a6a9bd', marginBottom: 26 }}>
+        True Herf Cigar Journal is a personal journal for logging and rating cigars you've smoked.
+        You must be {MIN_AGE} or older to use it.
+      </p>
+
+      <AuthError message={error} />
+
+      <div className="mb-6">
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a6a9bd', marginBottom: 7, letterSpacing: '0.01em' }}>
+          Date of birth
+        </label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <select aria-label="Day" value={day} onChange={(e) => setDay(e.target.value)} style={{ ...dobFieldStyle, flex: 1.1 }}>
+            <option value="">Day</option>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+          <select aria-label="Month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ ...dobFieldStyle, flex: 1.6 }}>
+            <option value="">Month</option>
+            {DOB_MONTHS.map((name, i) => (
+              <option key={name} value={i + 1}>{name}</option>
+            ))}
+          </select>
+          <input
+            aria-label="Year"
+            type="number"
+            inputMode="numeric"
+            placeholder="Year"
+            maxLength={4}
+            value={year}
+            onChange={(e) => setYear(e.target.value)}
+            style={{ ...dobFieldStyle, flex: 1.3 }}
+          />
+        </div>
+      </div>
+
+      <AuthButton onClick={handleContinue}>Continue</AuthButton>
+
+      <p className="text-center" style={{ marginTop: 22, fontSize: 11.5, color: '#6b6f8a', lineHeight: 1.5 }}>
+        By continuing, you confirm the date of birth you entered is accurate.
+      </p>
+    </AuthShell>
+  );
+}
+
 // ---- top-level: gates the app behind authentication ----
 export default function App() {
   const [auth, setAuth] = useState(() => getStoredAuth());
+  const [ageVerified, setAgeVerified] = useState(() => getAgeVerified());
   const deviceIdRef = useRef(null);
   if (deviceIdRef.current === null) deviceIdRef.current = getDeviceId();
 
@@ -3510,6 +3689,13 @@ export default function App() {
     clearStoredAuth();
     setAuth(null);
   };
+
+  // Existing accounts (a stored auth token) skip the age gate entirely --
+  // it only ever stands between an unauthenticated visitor and the
+  // marketing page, checkout, login, and signup screens.
+  if (!auth && !ageVerified) {
+    return <AgeGate onVerified={() => setAgeVerified(true)} />;
+  }
 
   if (!auth) {
     return <AuthFlow deviceId={deviceIdRef.current} claimToken={claimTokenRef.current} onAuthenticated={handleAuthenticated} />;
