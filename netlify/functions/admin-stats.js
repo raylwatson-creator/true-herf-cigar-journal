@@ -31,7 +31,8 @@ function getClientIp(req) {
   );
 }
 
-// Internal-only stats endpoint for the standalone admin page (public/admin.html).
+// Internal-only stats endpoint for the standalone admin page
+// (public/admin-5fc044b0acc883e3.html).
 // Not linked from anywhere in the customer-facing app. Gated by a shared
 // secret set as the ADMIN_PASSWORD environment variable in Netlify -- if that
 // variable isn't set at all, this refuses every request rather than being
@@ -70,6 +71,14 @@ export default async (req) => {
 
     // Correct password -- clear this IP's attempt count.
     await db.sql`DELETE FROM admin_login_attempts WHERE ip = ${ip}`;
+
+    // Bare-minimum audit trail: there's a single shared password and no
+    // per-user identity, so this is the only record of who (by IP) opened
+    // the dashboard and when. Not surfaced in the UI, just there to check
+    // later if it's ever needed. Pruned opportunistically (same pattern as
+    // checkout_rate_limit) so it doesn't grow forever.
+    await db.sql`INSERT INTO admin_access_log (ip) VALUES (${ip})`;
+    await db.sql`DELETE FROM admin_access_log WHERE created_at < NOW() - INTERVAL '90 days'`;
   } catch (e) {
     console.error("admin-stats auth check error:", e);
     return json(500, { error: "Something went wrong. Please try again." });
