@@ -15,6 +15,7 @@ const LOGIN_API = '/.netlify/functions/auth-login';
 const RESET_REQUEST_API = '/.netlify/functions/auth-reset-request';
 const RESET_CONFIRM_API = '/.netlify/functions/auth-reset-confirm';
 const CREATE_PAYMENT_INTENT_API = '/.netlify/functions/create-payment-intent';
+const DELETE_ACCOUNT_API = '/.netlify/functions/delete-account';
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
 // Loaded lazily (only once someone actually opens checkout) and cached, so
@@ -828,6 +829,24 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
     }
   };
 
+  // Permanently deletes the signed-in account (and, via ON DELETE CASCADE on
+  // entries.user_id, every one of its journal entries) after re-verifying the
+  // PIN server-side. Throws on failure so GuideView can show the error inline
+  // next to the PIN field; on success it calls onLogout() to drop back to the
+  // sign-in screen, same as a normal log out.
+  const deleteAccount = async (pin) => {
+    const res = await authFetch(DELETE_ACCOUNT_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Could not delete your account — please try again.');
+    }
+    onLogout();
+  };
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return entries;
@@ -879,7 +898,7 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
                 ) : view === 'stats' ? (
                   <StatsView entries={entries} onOpenEntry={(id) => { setActiveId(id); setView('detail'); }} />
                 ) : view === 'guide' ? (
-                  <GuideView userEmail={userEmail} onLogout={onLogout} />
+                  <GuideView userEmail={userEmail} onLogout={onLogout} onDeleteAccount={deleteAccount} />
                 ) : view === 'detail' && active ? (
                   <DetailView entry={active} onDelete={deleteEntry} onEdit={() => setView('edit')} />
                 ) : null}
@@ -2039,8 +2058,34 @@ function StatCard({ label, value, suffix }) {
   );
 }
 
-function GuideView({ userEmail, onLogout }) {
+function GuideView({ userEmail, onLogout, onDeleteAccount }) {
   const [confirming, setConfirming] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePin, setDeletePin] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const closeDeleteModal = () => {
+    if (deleteBusy) return;
+    setShowDeleteModal(false);
+    setDeletePin('');
+    setDeleteError('');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deletePin.length !== 4 || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError('');
+    try {
+      await onDeleteAccount(deletePin);
+      // Success drops back to the sign-in screen via onLogout() inside
+      // onDeleteAccount — nothing left to update on this now-unmounted view.
+    } catch (e) {
+      setDeleteError(e.message || 'Could not delete your account — please try again.');
+      setDeleteBusy(false);
+    }
+  };
+
   return (
     <div className="px-5 pt-4 pb-10 flex flex-col gap-6">
       <div>
@@ -2135,7 +2180,80 @@ function GuideView({ userEmail, onLogout }) {
             </button>
           )}
         </div>
+
+        <div className="text-[9px] font-semibold uppercase tracking-wide mt-3 mb-1.5" style={{ color: '#d97066' }}>
+          Danger Zone
+        </div>
+        <div className="py-1.5 px-2.5 rounded-lg flex items-center justify-between gap-2" style={{ background: '#0a0f2e', border: '1px solid #3a2323' }}>
+          <div className="text-[10px] leading-tight" style={{ color: '#8d91a8', maxWidth: 165 }}>
+            Permanently delete your account and every journal entry and photo attached to it. This cannot be undone.
+          </div>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="text-[11px] font-semibold px-2 py-1 rounded-md shrink-0"
+            style={{ color: '#d97066', border: '1px solid #d9706655' }}
+          >
+            Delete Account
+          </button>
+        </div>
       </div>
+
+      {/* Rendered through a portal straight to document.body, same reason as
+          the AddView photo-source sheet: this view can sit inside an animated
+          FlipPage wrapper, and a transform on that ancestor would otherwise
+          hijack what "fixed" positions against. */}
+      {showDeleteModal && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-5"
+          style={{ background: 'rgba(4,6,20,0.72)' }}
+          onClick={closeDeleteModal}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-6 text-center"
+            style={{ background: 'linear-gradient(180deg, #131b46, #0c1236)', border: '1px solid #283268' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm font-semibold mb-2" style={{ color: '#f3e9d8' }}>
+              Delete your account?
+            </div>
+            <div className="text-xs mb-4 leading-relaxed" style={{ color: '#8d91a8' }}>
+              This permanently deletes <span style={{ color: '#e8dbc3' }}>{userEmail}</span> and every journal entry and photo tied to it. This cannot be undone.
+            </div>
+            <div className="flex justify-center mb-2">
+              <PinInput value={deletePin} onChange={(v) => { setDeletePin(v); setDeleteError(''); }} autoFocus />
+            </div>
+            <div className="text-xs mb-1" style={{ color: '#696c80' }}>
+              Enter your 4-digit PIN to confirm
+            </div>
+            {deleteError && (
+              <div className="text-xs mt-2" style={{ color: '#e8b89a' }}>{deleteError}</div>
+            )}
+            <div className="flex items-center gap-2 mt-4">
+              <button
+                onClick={closeDeleteModal}
+                disabled={deleteBusy}
+                className="flex-1 text-sm px-3 py-2 rounded-lg"
+                style={{ color: '#8d91a8' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deletePin.length !== 4 || deleteBusy}
+                className="flex-1 text-sm font-semibold px-3 py-2 rounded-lg btn-raised-sm"
+                style={{
+                  color: '#2a0f0d',
+                  background: 'linear-gradient(155deg, #e28a80, #c65a4f)',
+                  opacity: deletePin.length === 4 && !deleteBusy ? 1 : 0.4,
+                }}
+              >
+                {deleteBusy ? 'Deleting…' : 'Delete Account'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
