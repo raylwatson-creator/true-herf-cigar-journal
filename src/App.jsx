@@ -3499,6 +3499,11 @@ export default function App() {
   const handleAuthenticated = (token, email) => {
     storeAuth(token, email);
     setAuth({ token, email });
+    // A claim token is single-use and already consumed by this point --
+    // clear it so a later logout (delete-account included) lands back on
+    // the normal sign-in gate instead of re-showing the claim/PIN-setup
+    // screen with a token that would just get rejected as already used.
+    claimTokenRef.current = '';
   };
 
   const handleLogout = () => {
