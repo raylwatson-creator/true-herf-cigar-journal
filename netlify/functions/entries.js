@@ -1,5 +1,5 @@
 import { getDatabase } from "@netlify/database";
-import { verifySession, getBearerToken } from "./_lib/auth.js";
+import { verifySession, getBearerToken, sessionVersionMatches } from "./_lib/auth.js";
 
 const db = getDatabase();
 
@@ -30,6 +30,13 @@ export default async (req) => {
   const method = req.method;
 
   try {
+    // Catches a token that's been revoked since it was issued (a PIN
+    // reset bumps session_version -- see auth-reset-confirm.js) even
+    // though its signature still checks out.
+    if (!(await sessionVersionMatches(db, session))) {
+      return json(401, { error: "Not signed in." });
+    }
+
     if (method === "GET") {
       const rows = await db.sql`
         SELECT id, data FROM entries

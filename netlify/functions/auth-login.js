@@ -25,7 +25,7 @@ export default async (req) => {
     }
 
     const [user] = await db.sql`
-      SELECT id, pin_hash, failed_attempts FROM users WHERE email = ${email}
+      SELECT id, pin_hash, failed_attempts, session_version FROM users WHERE email = ${email}
     `;
 
     // Same generic error whether the email doesn't exist or the PIN is wrong,
@@ -65,7 +65,7 @@ export default async (req) => {
       UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ${user.id}
     `;
 
-    const token = signSession(user.id);
+    const token = signSession(user.id, user.session_version);
     return json(200, { token, email });
   } catch (e) {
     console.error("auth-login error:", e);

@@ -26,13 +26,23 @@ export function verifyPin(pin, stored) {
 // --- Session tokens ----------------------------------------------------------
 // Lightweight HMAC-signed token (no expiry -- "stay logged in until logout").
 // Format: base64url(payload).base64url(signature)
+//
+// The payload carries `sv` (the user's session_version at the moment this
+// token was issued), added in the Sep 11 security review so a leaked token
+// can actually be invalidated. verifySession() only checks the signature --
+// it has no database access and can't check revocation by itself. Every
+// caller that authenticates a request must ALSO compare the returned `sv`
+// against the user's current session_version in the database (see
+// entries.js and delete-account.js for the pattern) to get real revocation;
+// skipping that check makes the token effectively un-revocable again, the
+// exact gap this was built to close.
 function base64url(input) {
   return Buffer.from(input).toString("base64url");
 }
 
-export function signSession(userId) {
+export function signSession(userId, sessionVersion = 0) {
   if (!SESSION_SECRET) throw new Error("SESSION_SECRET is not configured");
-  const payload = base64url(JSON.stringify({ uid: userId, iat: Date.now() }));
+  const payload = base64url(JSON.stringify({ uid: userId, sv: sessionVersion, iat: Date.now() }));
   const sig = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("base64url");
   return `${payload}.${sig}`;
 }
@@ -48,10 +58,24 @@ export function verifySession(token) {
   if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return null;
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString());
-    return data && data.uid ? data : null;
+    // Tokens issued before this column existed have no `sv` field --
+    // default it to 0 so they're compared against session_version's own
+    // default of 0 and keep working rather than getting silently rejected.
+    return data && data.uid ? { ...data, sv: data.sv ?? 0 } : null;
   } catch {
     return null;
   }
+}
+
+// Compares a verified session's embedded sv against the user's current
+// session_version in the database. This is the actual revocation check --
+// verifySession alone only proves the token wasn't tampered with, not that
+// it's still current. Returns false (treat as signed out) if the user row
+// is gone too, which covers a deleted account for free.
+export async function sessionVersionMatches(db, session) {
+  const [row] = await db.sql`SELECT session_version FROM users WHERE id = ${session.uid}`;
+  if (!row) return false;
+  return (row.session_version || 0) === (session.sv || 0);
 }
 
 export function getBearerToken(req) {

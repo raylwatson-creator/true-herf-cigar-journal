@@ -1,5 +1,5 @@
 import { getDatabase } from "@netlify/database";
-import { verifySession, getBearerToken, verifyPin, PIN_RE } from "./_lib/auth.js";
+import { verifySession, getBearerToken, verifyPin, PIN_RE, sessionVersionMatches } from "./_lib/auth.js";
 
 const db = getDatabase();
 
@@ -17,6 +17,13 @@ export default async (req) => {
   const userId = session.uid;
 
   try {
+    // Same revocation check as entries.js -- a signature-valid but
+    // since-revoked token (e.g. from a PIN reset after this session was
+    // issued) shouldn't be able to delete the account either.
+    if (!(await sessionVersionMatches(db, session))) {
+      return json(401, { error: "Not signed in." });
+    }
+
     const body = await req.json();
     const pin = body.pin;
 

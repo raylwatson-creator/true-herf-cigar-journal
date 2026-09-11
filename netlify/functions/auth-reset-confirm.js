@@ -64,14 +64,22 @@ export default async (req) => {
     const pinHash = hashPin(newPin);
 
     await db.sql`UPDATE password_resets SET used = TRUE WHERE id = ${active.id}`;
-    await db.sql`
+    // Bumping session_version here, not just changing the PIN, is what
+    // actually invalidates every other session token issued before this
+    // reset -- someone who reset a PIN because a device with a live
+    // session was lost or stolen needs that old session cut off, not just
+    // the PIN changed underneath it. See sessionVersionMatches() in
+    // _lib/auth.js for the other half of this.
+    const [updated] = await db.sql`
       UPDATE users
-      SET pin_hash = ${pinHash}, failed_attempts = 0, locked_until = NULL
+      SET pin_hash = ${pinHash}, failed_attempts = 0, locked_until = NULL,
+          session_version = session_version + 1
       WHERE id = ${user.id}
+      RETURNING session_version
     `;
 
     // Log them in immediately so the reset flow also completes login.
-    const token = signSession(user.id);
+    const token = signSession(user.id, updated.session_version);
     return json(200, { token, email });
   } catch (e) {
     console.error("auth-reset-confirm error:", e);

@@ -1,0 +1,12 @@
+-- Lets a single user's outstanding session tokens be invalidated without
+-- touching anyone else's, and without needing an expiry on the tokens
+-- themselves. signSession() embeds the user's current session_version in
+-- every token it issues; verifying a token now also checks that its
+-- embedded version still matches the users row. Bumping this column (done
+-- on a successful PIN reset, see auth-reset-confirm.js) immediately kills
+-- every previously issued token for that account.
+--
+-- Defaults to 0 for existing rows, matching the "no sv field" fallback of
+-- 0 that verification uses for tokens issued before this column existed --
+-- so already-logged-in users stay logged in after this deploys.
+ALTER TABLE users ADD COLUMN session_version INT NOT NULL DEFAULT 0;

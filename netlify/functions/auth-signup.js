@@ -55,7 +55,7 @@ export default async (req) => {
     const [user] = await db.sql`
       INSERT INTO users (email, pin_hash)
       VALUES (${email}, ${pinHash})
-      RETURNING id
+      RETURNING id, session_version
     `;
 
     await db.sql`UPDATE purchases SET claimed_at = NOW() WHERE id = ${purchase.id}`;
@@ -68,7 +68,7 @@ export default async (req) => {
       `;
     }
 
-    const token = signSession(user.id);
+    const token = signSession(user.id, user.session_version);
     return json(201, { token, email });
   } catch (e) {
     console.error("auth-signup error:", e);
