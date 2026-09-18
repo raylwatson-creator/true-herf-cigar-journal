@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Plus, Search, Camera, ChevronLeft, ChevronRight, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star, List, LayoutGrid, Share2, MoreVertical, Check, Smartphone } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
@@ -18,6 +18,12 @@ const RESET_REQUEST_API = '/.netlify/functions/auth-reset-request';
 const RESET_CONFIRM_API = '/.netlify/functions/auth-reset-confirm';
 const CREATE_PAYMENT_INTENT_API = '/.netlify/functions/create-payment-intent';
 const DELETE_ACCOUNT_API = '/.netlify/functions/delete-account';
+const A11Y_KEY = 'cigar-a11y-settings';
+// Journal list is fetched one page at a time (see netlify/functions/entries.js).
+const PAGE_SIZE = 20;
+// Shared by the Strength / Body selectors, the detail page and the shared image:
+// five steps, lightest to strongest. Stored on an entry as a whole number 0 to 4 (or null).
+const STRENGTH_COLORS = ['#d9b45a', '#d39a3c', '#c7772f', '#b5522b', '#8f2f22'];
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
 // Loaded lazily (only once someone actually opens checkout) and cached, so
@@ -108,6 +114,98 @@ function storeViewMode(mode) {
   } catch (e) {
     // localStorage unavailable — the choice just won't stick this session
   }
+}
+
+// ---- accessibility settings (Account tab) ----
+// Stored on this device only. "match" (on by default) means text size, contrast and
+// motion follow the phone's own settings; the other three are always manual because
+// a phone has no equivalent setting to follow.
+const DEFAULT_A11Y = { match: true, text: 0, contrast: false, motion: false, simple: false, tap: false, pin: false };
+
+function getStoredA11y() {
+  try {
+    const raw = window.localStorage.getItem(A11Y_KEY);
+    return raw ? { ...DEFAULT_A11Y, ...JSON.parse(raw) } : DEFAULT_A11Y;
+  } catch (e) {
+    return DEFAULT_A11Y;
+  }
+}
+
+function storeA11y(settings) {
+  try {
+    window.localStorage.setItem(A11Y_KEY, JSON.stringify(settings));
+  } catch (e) {
+    // localStorage unavailable — settings just won't stick this session
+  }
+}
+
+function readMedia(query) {
+  try {
+    return window.matchMedia(query).matches;
+  } catch (e) {
+    return false;
+  }
+}
+
+const A11yContext = React.createContext({
+  settings: DEFAULT_A11Y,
+  effective: { text: 0, contrast: false, motion: false, simple: false, tap: false, pin: false },
+  device: { contrast: false, motion: false },
+  update: () => {},
+});
+
+// Owns the settings, works out what is actually in effect (device values while
+// "match device settings" is on), and mirrors that onto <html> as data attributes
+// that the CSS in GlobalStyles keys off.
+function useA11ySettings() {
+  const [settings, setSettings] = useState(getStoredA11y);
+  const [device, setDevice] = useState(() => ({
+    contrast: readMedia('(prefers-contrast: more)'),
+    motion: readMedia('(prefers-reduced-motion: reduce)'),
+  }));
+
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const contrastQ = window.matchMedia('(prefers-contrast: more)');
+    const motionQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const sync = () => setDevice({ contrast: contrastQ.matches, motion: motionQ.matches });
+    contrastQ.addEventListener?.('change', sync);
+    motionQ.addEventListener?.('change', sync);
+    return () => {
+      contrastQ.removeEventListener?.('change', sync);
+      motionQ.removeEventListener?.('change', sync);
+    };
+  }, []);
+
+  const update = (patch) =>
+    setSettings((prev) => {
+      const next = { ...prev, ...patch };
+      storeA11y(next);
+      return next;
+    });
+
+  // A web page cannot read the phone's text-size setting, so while "match device" is
+  // on the app adds no scaling of its own and the phone/browser handles it (Android
+  // Chrome follows the system font size natively). Picking a size by hand applies it.
+  const effective = {
+    text: settings.match ? 0 : settings.text,
+    contrast: settings.match ? device.contrast : settings.contrast,
+    motion: settings.match ? device.motion : settings.motion,
+    simple: settings.simple,
+    tap: settings.tap,
+    pin: settings.pin,
+  };
+
+  useEffect(() => {
+    const el = document.documentElement;
+    el.dataset.thText = String(effective.text);
+    el.dataset.thContrast = effective.contrast ? '1' : '0';
+    el.dataset.thMotion = effective.motion ? '1' : '0';
+    el.dataset.thSimple = effective.simple ? '1' : '0';
+    el.dataset.thBig = effective.tap ? '1' : '0';
+  }, [effective.text, effective.contrast, effective.motion, effective.simple, effective.tap]);
+
+  return { settings, effective, device, update };
 }
 
 // ---- flavor wheel data ----
@@ -284,11 +382,15 @@ async function generateEntryImage(entry) {
     });
   }
 
+  // Strength / Body bars (side by side in one row) only take room when one is set
+  const hasLevels = entry.strength != null || entry.body != null;
+  const barsH = hasLevels ? 132 : 0;
+
   // reclaim photo height for long notes so the card never overflows/clips
   let photoH = photoImg ? maxPhotoH : 0;
   if (photoImg && thirdsList.length) {
     const neededFull = measureThirds(1);
-    const fixedNonPhotoH = 48 + 264 + metaExtraRowsH + 140 + 92 + 160;
+    const fixedNonPhotoH = 48 + 264 + metaExtraRowsH + 140 + barsH + 92 + 160;
     const idealPhotoH = H - fixedNonPhotoH - neededFull;
     photoH = Math.max(minPhotoH, Math.min(maxPhotoH, idealPhotoH));
   }
@@ -381,6 +483,48 @@ async function generateEntryImage(entry) {
     if (mx > W - pad - 300) { mx = pad; y += 108; }
   });
   y += 140;
+
+  // Strength and Body: five blocks each, chosen one lit, "Mild / Medium / Bold" (or Full) underneath
+  if (hasLevels) {
+    const colGap = 48;
+    const colW = (contentW - colGap) / 2;
+    const bars = [
+      ['STRENGTH', entry.strength, 'Bold'],
+      ['BODY', entry.body, 'Full'],
+    ].filter(([, v]) => v != null);
+    bars.forEach(([label, val, lastLabel], idx) => {
+      const bx = pad + idx * (colW + colGap);
+      ctx.fillStyle = '#c9a227';
+      ctx.font = '600 28px "Source Sans 3", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(label, bx, y + 22);
+      const gap = 8;
+      const bw = (colW - gap * 4) / 5;
+      STRENGTH_COLORS.forEach((color, i) => {
+        const bxi = bx + i * (bw + gap);
+        ctx.globalAlpha = i === val ? 1 : 0.3;
+        ctx.fillStyle = color;
+        roundRectPath(ctx, bxi, y + 40, bw, 32, 8);
+        ctx.fill();
+        if (i === val) {
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = '#f3e9d8';
+          ctx.stroke();
+        }
+      });
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#8d91a8';
+      ctx.font = '600 26px "Source Sans 3", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Mild', bx, y + 108);
+      ctx.textAlign = 'center';
+      ctx.fillText('Medium', bx + colW / 2, y + 108);
+      ctx.textAlign = 'right';
+      ctx.fillText(lastLabel, bx + colW, y + 108);
+      ctx.textAlign = 'left';
+    });
+    y += barsH;
+  }
 
   if (thirdsList.length) {
     const footerReserve = 160;
@@ -758,17 +902,122 @@ function GlobalStyles() {
     @media (prefers-reduced-motion: reduce) {
       .btn-raised, .btn-raised-sm { transition: none; }
     }
+
+    /* ---- loading placeholders (Journal list, Stats) ---- */
+    .th-shimmer {
+      background: linear-gradient(90deg, #131b46 0%, #222d6b 50%, #131b46 100%);
+      background-size: 200% 100%;
+      animation: thShimmer 1.3s linear infinite;
+    }
+    @keyframes thShimmer { to { background-position: -200% 0; } }
+
+    /* ---- bottom navigation ---- */
+    .th-nav {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+      display: flex; justify-content: center; pointer-events: none;
+      transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .th-nav.th-nav-hidden { transform: translateY(110%); }
+    .th-nav-bar {
+      width: 100%; max-width: 448px; pointer-events: auto;
+      display: flex; align-items: stretch; justify-content: space-around;
+      padding: 8px 4px calc(10px + env(safe-area-inset-bottom));
+      background: #06091a; border-top: 1px solid #283268;
+    }
+    .th-nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      background: none; border: 0; color: #a9adc4; font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em;
+      min-height: 56px; cursor: pointer;
+    }
+    .th-nav-btn.th-active { color: #c9a227; }
+    .th-nav-add {
+      width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(155deg, #b5652f, #8a4f24); color: #f6ecd9; border: 1.5px solid #d99a63;
+      box-shadow: 0 3px 0 #5e3416, 0 4px 10px rgba(0,0,0,0.4);
+    }
+    .th-nav-avatar {
+      width: 26px; height: 26px; border-radius: 9999px; display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 30% 25%, #e2c25a, #9a7a14); color: #0a0f2e;
+      font-family: 'Fraunces', serif; font-weight: 700; font-size: 12px; border: 2px solid transparent;
+    }
+    .th-nav-btn.th-active .th-nav-avatar { border-color: rgba(255,255,255,0.6); }
+
+    /* ---- accessibility settings (set on <html> by useA11ySettings) ---- */
+    /* Text size: scales the page content and popups (the nav bar stays a fixed size). */
+    [data-th-text="1"] .th-zoomable { zoom: 1.15; }
+    [data-th-text="2"] .th-zoomable { zoom: 1.3; }
+
+    /* High contrast: most colors here are inline styles, so the muted grays, faint
+       borders and gold are lifted by matching the browser's rgb() form of those exact colors. */
+    [data-th-contrast="1"] [style*="rgb(141, 145, 168)"],
+    [data-th-contrast="1"] [style*="rgb(105, 108, 128)"],
+    [data-th-contrast="1"] [style*="rgb(113, 117, 143)"],
+    [data-th-contrast="1"] [style*="rgb(166, 169, 189)"] { color: #e2e4f0 !important; }
+    [data-th-contrast="1"] [style*="rgb(60, 69, 118)"] { color: #b9bdd6 !important; }
+    [data-th-contrast="1"] [style*="rgb(201, 162, 39)"] { color: #f5cf4a !important; }
+    [data-th-contrast="1"] [style*="rgb(19, 26, 67)"],
+    [data-th-contrast="1"] [style*="rgb(40, 50, 104)"] { border-color: #6f7ed0 !important; }
+    [data-th-contrast="1"] input::placeholder, [data-th-contrast="1"] textarea::placeholder { color: #b9bdd6; }
+    [data-th-contrast="1"] .th-nav-btn { color: #e6e8f3; }
+    [data-th-contrast="1"] .th-nav-btn.th-active { color: #f5cf4a; }
+    [data-th-contrast="1"] .th-nav-bar { border-top-color: #6f7ed0; }
+    [data-th-contrast="1"] .th-shimmer { background-image: linear-gradient(90deg, #26306a 0%, #3a4790 50%, #26306a 100%); }
+
+    /* Reduce motion: animations and transitions collapse to instant. The splash still
+       shows (static) for a moment, same as the phone-level setting already did. */
+    [data-th-motion="1"] *, [data-th-motion="1"] *::before, [data-th-motion="1"] *::after {
+      animation-duration: 0.01ms !important; animation-delay: 0s !important;
+      animation-iteration-count: 1 !important; transition-duration: 0.01ms !important;
+      transition-delay: 0s !important; scroll-behavior: auto !important;
+    }
+    [data-th-motion="1"] .splash-screen, [data-th-motion="1"] .splash-band, [data-th-motion="1"] .splash-wordmark,
+    [data-th-motion="1"] .splash-ember, [data-th-motion="1"] .smoke-wisp, [data-th-motion="1"] .smoke-sheet {
+      animation: none !important; opacity: 1 !important; transform: none !important;
+    }
+    [data-th-motion="1"] .smoke-wisp, [data-th-motion="1"] .smoke-sheet { opacity: 0 !important; }
+    [data-th-motion="1"] .splash-screen { animation: splashFade 2.6s linear forwards !important; }
+
+    /* Simplify background: flat navy, no photo, smoke or grain. */
+    [data-th-simple="1"] .app-shell { background-image: none !important; background-color: #0a0f2e; }
+    [data-th-simple="1"] .grain, [data-th-simple="1"] .th-backdrop { display: none; }
+
+    /* Larger tap targets. */
+    [data-th-big="1"] .btn-raised, [data-th-big="1"] .btn-raised-sm { min-height: 48px; min-width: 44px; }
+    [data-th-big="1"] input, [data-th-big="1"] textarea, [data-th-big="1"] select { min-height: 48px; }
+    [data-th-big="1"] .th-nav-btn { min-height: 66px; }
+    [data-th-big="1"] .th-nav-add { width: 46px; height: 46px; }
+    [data-th-big="1"] .th-nav-avatar { width: 32px; height: 32px; }
   `}</style>
   );
 }
 
 // ---- main app (requires an authenticated session) ----
 function CigarJournal({ authToken, userEmail, onLogout }) {
-  const [entries, setEntries] = useState([]);
-  const [loaded, setLoaded] = useState(false);
-  const [view, setView] = useState('list');
-  const [activeId, setActiveId] = useState(null);
+  const { effective: a11y } = useContext(A11yContext);
+
+  // Journal list: one page at a time (20 per page), fetched from the server without photos.
+  const [pageData, setPageData] = useState({ entries: [], total: 0, page: 1, pages: 1 });
+  const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [listLoading, setListLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Every entry, photos included. Only loaded when the Stats tab is opened (totals, flavor
+  // chart and the Cigar Calendar need all of them); cleared whenever an entry changes.
+  const [allEntries, setAllEntries] = useState(null);
+  // Photos arrive separately from the list text, one at a time, and fade in as they land.
+  // id -> data URL. false = the fetch failed (retried next time that page loads).
+  const [photoCache, setPhotoCache] = useState({});
+  const photoCacheRef = useRef({});
+  const photoInflight = useRef({});
+  const listReq = useRef(0);
+  const dqRef = useRef('');
+
+  const [view, setView] = useState('list');
+  const [detailFrom, setDetailFrom] = useState('list');
+  const [activeId, setActiveId] = useState(null);
+  // An entry opened from the Stats calendar (not part of the current list page).
+  const [stashed, setStashed] = useState(null);
   const [error, setError] = useState('');
   const [showSplash, setShowSplash] = useState(true);
 
@@ -785,27 +1034,136 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
   };
 
   useEffect(() => {
-    const t = setTimeout(() => setShowSplash(false), 3250);
+    // Reduce-motion shows the splash static for a shorter time (matches the CSS in GlobalStyles).
+    const t = setTimeout(() => setShowSplash(false), a11y.motion ? 2600 : 3250);
     return () => clearTimeout(t);
   }, []);
 
+  // ---- photos ----
+  const cachePhoto = (id, photo) => {
+    let next = { ...photoCacheRef.current, [id]: photo };
+    const keys = Object.keys(next);
+    if (keys.length > 120) {
+      keys.slice(0, keys.length - 100).forEach((k) => { if (k !== id) delete next[k]; });
+    }
+    photoCacheRef.current = next;
+    setPhotoCache(next);
+  };
+
+  const fetchPhoto = (id) => {
+    const cached = photoCacheRef.current[id];
+    if (typeof cached === 'string') return Promise.resolve(cached);
+    if (photoInflight.current[id]) return photoInflight.current[id];
+    const p = (async () => {
+      try {
+        const res = await authFetch(`${ENTRIES_API}?photo=${encodeURIComponent(id)}`);
+        if (!res.ok) throw new Error('photo failed');
+        const data = await res.json();
+        cachePhoto(id, data.photo || null);
+        return data.photo || null;
+      } catch (e) {
+        cachePhoto(id, false);
+        return null;
+      } finally {
+        delete photoInflight.current[id];
+      }
+    })();
+    photoInflight.current[id] = p;
+    return p;
+  };
+
+  const loadPhotosFor = (list) => {
+    const ids = list
+      .filter((e) => e.hasPhoto && typeof photoCacheRef.current[e.id] !== 'string')
+      .map((e) => e.id);
+    let i = 0;
+    const worker = async () => {
+      while (i < ids.length) {
+        const id = ids[i];
+        i += 1;
+        await fetchPhoto(id);
+      }
+    };
+    // A few at a time; each one fades in the moment it arrives.
+    for (let w = 0; w < Math.min(4, ids.length); w += 1) worker();
+  };
+
+  // string = ready, null = this entry has no photo, undefined = still on its way
+  const resolvePhoto = (e) => {
+    if (typeof e.hasPhoto !== 'boolean') return e.photo ?? null; // a full entry (photo included)
+    if (!e.hasPhoto) return null;
+    const c = photoCache[e.id];
+    if (typeof c === 'string') return c;
+    if (c === false) return null;
+    return undefined;
+  };
+
+  // ---- journal list (paged, searched on the server) ----
   useEffect(() => {
+    const t = setTimeout(() => {
+      const q = query.trim();
+      if (q !== dqRef.current) {
+        dqRef.current = q;
+        setDebouncedQuery(q);
+        setPage(1);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    listReq.current += 1;
+    const mine = listReq.current;
+    setListLoading(true);
+    (async () => {
+      try {
+        const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
+        if (debouncedQuery) params.set('q', debouncedQuery);
+        const res = await authFetch(`${ENTRIES_API}?${params.toString()}`);
+        if (!res.ok) throw new Error('load failed');
+        const data = await res.json();
+        if (mine !== listReq.current) return;
+        setPageData(data);
+        setError('');
+        loadPhotosFor(data.entries);
+      } catch (e) {
+        if (mine !== listReq.current) return;
+        setError('Could not load your entries. Check your connection.');
+      } finally {
+        if (mine === listReq.current) setListLoading(false);
+      }
+    })();
+  }, [page, debouncedQuery, refreshKey]);
+
+  // ---- all entries, for the Stats tab only ----
+  useEffect(() => {
+    if (view !== 'stats' || allEntries !== null) return undefined;
+    let cancelled = false;
     (async () => {
       try {
         const res = await authFetch(ENTRIES_API);
-        if (res.ok) {
-          const data = await res.json();
-          setEntries(data);
-        } else {
-          setError('Could not load your entries — check your connection.');
-        }
+        if (!res.ok) throw new Error('load failed');
+        const data = await res.json();
+        if (!cancelled) setAllEntries(data);
       } catch (e) {
-        setError('Could not load your entries — check your connection.');
-      } finally {
-        setLoaded(true);
+        if (!cancelled) setError('Could not load your stats. Check your connection.');
       }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [view, allEntries]);
+
+  const go = (next) => {
+    setError('');
+    setView(next);
+    window.scrollTo(0, 0);
+  };
+
+  const openEntry = (id, from, entryObj = null) => {
+    setActiveId(id);
+    setStashed(entryObj);
+    setDetailFrom(from);
+    go('detail');
+  };
 
   const addEntry = async (entry) => {
     try {
@@ -816,8 +1174,15 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
       });
       if (!res.ok) throw new Error('save failed');
       const created = await res.json();
-      setEntries((prev) => [created, ...prev]);
-      setView('list');
+      cachePhoto(created.id, created.photo || null);
+      setAllEntries(null);
+      // Back to page 1 (newest first), with any search cleared so the new entry is visible.
+      setQuery('');
+      dqRef.current = '';
+      setDebouncedQuery('');
+      setPage(1);
+      setRefreshKey((k) => k + 1);
+      go('list');
     } catch (e) {
       setError('Could not save — please try again.');
     }
@@ -832,8 +1197,15 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
       });
       if (!res.ok) throw new Error('update failed');
       const saved = await res.json();
-      setEntries((prev) => prev.map((e) => (e.id === activeId ? saved : e)));
-      setView('detail');
+      const { photo: savedPhoto, ...rest } = saved;
+      cachePhoto(saved.id, savedPhoto || null);
+      setPageData((prev) => ({
+        ...prev,
+        entries: prev.entries.map((e) => (e.id === activeId ? { ...rest, hasPhoto: !!savedPhoto } : e)),
+      }));
+      setStashed((s) => (s && s.id === activeId ? saved : s));
+      setAllEntries(null);
+      go('detail');
     } catch (e) {
       setError('Could not save changes — please try again.');
     }
@@ -847,8 +1219,16 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
         body: JSON.stringify({ id }),
       });
       if (!res.ok) throw new Error('delete failed');
-      setEntries((prev) => prev.filter((e) => e.id !== id));
-      setView('list');
+      setAllEntries(null);
+      setStashed(null);
+      // If the deleted entry was the only one on the current (last) page, step back one
+      // page. Gated on it actually being that page's entry -- otherwise a Stats-calendar
+      // delete of something outside the current Journal search could step back a page
+      // that was never affected.
+      const wasOnPage = pageData.entries.some((e) => e.id === id);
+      if (wasOnPage && pageData.entries.length === 1 && page > 1) setPage(page - 1);
+      setRefreshKey((k) => k + 1);
+      go(detailFrom === 'stats' ? 'stats' : 'list');
     } catch (e) {
       setError('Could not delete — please try again.');
     }
@@ -856,7 +1236,7 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
 
   // Permanently deletes the signed-in account (and, via ON DELETE CASCADE on
   // entries.user_id, every one of its journal entries) after re-verifying the
-  // PIN server-side. Throws on failure so GuideView can show the error inline
+  // PIN server-side. Throws on failure so AccountView can show the error inline
   // next to the PIN field; on success it calls onLogout() to drop back to the
   // sign-in screen, same as a normal log out.
   const deleteAccount = async (pin) => {
@@ -872,22 +1252,20 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
     onLogout();
   };
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return entries;
-    return entries.filter((e) =>
-      [
-        e.brand, e.name, e.vitola, e.wrapper, e.binder, e.filler, e.pairing,
-        e.thirds?.first, e.thirds?.second, e.thirds?.final,
-        ...(e.thirdsFlavors?.first || []), ...(e.thirdsFlavors?.second || []), ...(e.thirdsFlavors?.final || []),
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(q)
-    );
-  }, [entries, query]);
+  const rawActive =
+    pageData.entries.find((e) => e.id === activeId) || (stashed && stashed.id === activeId ? stashed : null);
+  const active = rawActive ? { ...rawActive, photo: resolvePhoto(rawActive) } : null;
 
-  const active = entries.find((e) => e.id === activeId);
+  // Editing needs the photo in hand (the form starts from it), so wait for it if it is still loading.
+  const openEdit = async () => {
+    if (active && active.photo === undefined) await fetchPhoto(active.id);
+    go('edit');
+  };
+
+  // A detail page belongs to whichever tab it was opened from.
+  const navTab = view === 'detail' ? detailFrom : view;
+  const formOpen = view === 'add' || view === 'edit';
+  const navVisible = !showSplash && !formOpen;
 
   return (
     <div className="min-h-screen w-full relative" style={{ fontFamily: "'Source Sans 3', ui-sans-serif, system-ui" }}>
@@ -897,8 +1275,14 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
       <div className="app-shell min-h-screen w-full absolute inset-0" />
       <div className="grain" />
 
-      <div className="max-w-md mx-auto min-h-screen relative pb-24">
-        <Header view={view} setView={setView} onBack={() => setView(view === 'edit' ? 'detail' : 'list')} />
+      <div
+        className="th-zoomable max-w-md mx-auto min-h-screen relative"
+        style={{ paddingBottom: formOpen ? 40 : 'calc(104px + env(safe-area-inset-bottom))' }}
+      >
+        <Header
+          view={view}
+          onBack={() => go(view === 'edit' ? 'detail' : view === 'detail' ? detailFrom : 'list')}
+        />
 
         {error && (
           <div className="mx-5 mb-3 px-3 py-2 rounded text-sm" style={{ background: '#3a2416', color: '#e8b89a', border: '1px solid #5c3a1e' }}>
@@ -906,52 +1290,82 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
           </div>
         )}
 
-        {!loaded ? (
-          <div className="px-5 py-10 text-center" style={{ color: '#8d91a8' }}>
-            Loading your humidor…
-          </div>
-        ) : (
-          <div style={{ position: 'relative', perspective: 1000, overflow: 'hidden' }}>
-            <AnimatePresence mode="popLayout" initial={false}>
-              <FlipPage key={view}>
-                {view === 'list' ? (
-                  <ListView entries={filtered} query={query} setQuery={setQuery} onOpen={(id) => { setActiveId(id); setView('detail'); }} total={entries.length} />
-                ) : view === 'add' ? (
-                  <AddView onSave={addEntry} onCancel={() => setView('list')} />
-                ) : view === 'edit' && active ? (
-                  <AddView initialEntry={active} onSave={editEntry} onCancel={() => setView('detail')} />
-                ) : view === 'stats' ? (
-                  <StatsView entries={entries} onOpenEntry={(id) => { setActiveId(id); setView('detail'); }} />
-                ) : view === 'guide' ? (
-                  <GuideView userEmail={userEmail} onLogout={onLogout} onDeleteAccount={deleteAccount} />
-                ) : view === 'detail' && active ? (
-                  <DetailView entry={active} onDelete={deleteEntry} onEdit={() => setView('edit')} />
-                ) : null}
-              </FlipPage>
-            </AnimatePresence>
-          </div>
-        )}
-
-        {(view === 'list' || view === 'stats' || view === 'guide') && (
-          <button
-            onClick={() => setView('add')}
-            className="fixed bottom-6 rounded-full flex items-center justify-center btn-raised"
-            style={{
-              right: 'calc(50% - 208px + 20px)',
-              width: 56,
-              height: 56,
-              background: 'linear-gradient(155deg, #b5652f, #8a4f24)',
-              color: '#f6ecd9',
-              // Pinned to the highest stacking layer in the app so nothing — current or
-              // future (modals, overlays, banners) — can ever render on top of it.
-              zIndex: 9999,
-            }}
-          >
-            <Plus size={26} />
-          </button>
-        )}
+        <div style={{ position: 'relative', perspective: 1000, overflow: 'hidden' }}>
+          <AnimatePresence mode="popLayout" initial={false}>
+            <FlipPage key={view}>
+              {view === 'list' ? (
+                <ListView
+                  entries={pageData.entries}
+                  query={query}
+                  setQuery={setQuery}
+                  onOpen={(id) => openEntry(id, 'list')}
+                  total={pageData.total}
+                  page={page}
+                  pages={pageData.pages}
+                  loading={listLoading}
+                  onPage={(p) => { setPage(p); window.scrollTo(0, 0); }}
+                  resolvePhoto={resolvePhoto}
+                />
+              ) : view === 'add' ? (
+                <AddView onSave={addEntry} onCancel={() => go('list')} />
+              ) : view === 'edit' && active ? (
+                <AddView initialEntry={active} onSave={editEntry} onCancel={() => go('detail')} />
+              ) : view === 'stats' ? (
+                <StatsView
+                  entries={allEntries}
+                  onOpenEntry={(id) => openEntry(id, 'stats', (allEntries || []).find((e) => e.id === id) || null)}
+                />
+              ) : view === 'guide' ? (
+                <GuideView />
+              ) : view === 'account' ? (
+                <AccountView userEmail={userEmail} onLogout={onLogout} onDeleteAccount={deleteAccount} />
+              ) : view === 'detail' && active ? (
+                <DetailView entry={active} onDelete={deleteEntry} onEdit={openEdit} />
+              ) : null}
+            </FlipPage>
+          </AnimatePresence>
+        </div>
       </div>
+
+      <BottomNav tab={navTab} onSelect={(key) => go(key)} visible={navVisible} userEmail={userEmail} />
     </div>
+  );
+}
+
+// Fixed to the bottom of the SCREEN (not the page), hidden until the splash is done and
+// while the New Entry / Edit form has the screen. It sits at z-index 40: above the page,
+// below every popup (those are z-50 and dim the whole screen, nav included).
+function BottomNav({ tab, onSelect, visible, userEmail }) {
+  const initial = (userEmail || '?').trim().charAt(0).toUpperCase() || '?';
+  const items = [
+    { key: 'list', label: 'Journal', aria: 'Journal', icon: <BookOpen size={25} /> },
+    { key: 'stats', label: 'Stats', aria: 'Stats', icon: <BarChart2 size={25} /> },
+    { key: 'add', label: 'Add', aria: 'Add new entry', icon: <span className="th-nav-add"><Plus size={22} strokeWidth={2.4} /></span> },
+    { key: 'guide', label: 'Guide', aria: 'Guide', icon: <Ruler size={25} /> },
+    { key: 'account', label: 'Account', aria: 'Account', icon: <span className="th-nav-avatar">{initial}</span> },
+  ];
+  return (
+    <nav className={`th-nav ${visible ? '' : 'th-nav-hidden'}`} aria-label="Main" aria-hidden={!visible}>
+      <div className="th-nav-bar" style={{ pointerEvents: visible ? 'auto' : 'none' }}>
+        {items.map((it) => {
+          const active = it.key !== 'add' && tab === it.key;
+          return (
+            <button
+              key={it.key}
+              type="button"
+              className={`th-nav-btn ${active ? 'th-active' : ''}`}
+              onClick={() => onSelect(it.key === 'add' ? 'add' : it.key)}
+              aria-label={it.aria}
+              aria-current={active ? 'page' : undefined}
+              tabIndex={visible ? 0 : -1}
+            >
+              {it.icon}
+              <span>{it.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -999,13 +1413,13 @@ const FlipPage = React.forwardRef(function FlipPage({ children }, ref) {
   );
 });
 
-function Header({ view, setView, onBack }) {
-  const titles = { list: 'True Herf Cigar Journal', add: 'New Entry', edit: 'Edit Entry', stats: 'Stats', guide: 'Guide', detail: 'Details' };
+function Header({ view, onBack }) {
+  const titles = { list: 'True Herf Cigar Journal', add: 'New Entry', edit: 'Edit Entry', stats: 'Stats', guide: 'Guide', account: 'Account', detail: 'Details' };
   return (
     <div className="px-5 pt-6 pb-4" style={{ borderBottom: '1px solid #131a43' }}>
       <div className="flex items-center gap-2">
-        {view !== 'list' && (
-          <button onClick={onBack} className="p-2.5 -ml-1 rounded-full btn-raised-sm" style={{ color: '#c9a227', background: '#131b46' }}>
+        {view !== 'list' && view !== 'stats' && view !== 'guide' && view !== 'account' && (
+          <button onClick={onBack} className="p-2.5 -ml-1 rounded-full btn-raised-sm" style={{ color: '#c9a227', background: '#131b46' }} aria-label="Back">
             <ChevronLeft size={24} />
           </button>
         )}
@@ -1015,40 +1429,12 @@ function Header({ view, setView, onBack }) {
               Humidor Journal
             </div>
           )}
-          {/* Full title, never clipped — it now has the whole row to itself
-              instead of sharing a line with the nav buttons. */}
+          {/* Full title, never clipped. Navigation now lives in the bottom bar. */}
           <h1 className="font-serif font-semibold" style={{ fontSize: 19, color: '#f3e9d8', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
             {titles[view]}
           </h1>
         </div>
       </div>
-      {view !== 'add' && view !== 'edit' && (
-        // Nav buttons drop to their own row below the title, right-aligned,
-        // with a bit of space above them ("slightly lower").
-        <div className="flex gap-2 justify-end" style={{ marginTop: 14 }}>
-          <button
-            onClick={() => setView('list')}
-            className={`px-4 py-2.5 rounded-full flex items-center gap-1 btn-raised-sm ${view === 'list' ? 'btn-pressed-sm' : ''}`}
-            style={{ background: view === 'list' ? '#e8dbc3' : '#131b46', color: view === 'list' ? '#0a0f2e' : '#c9a227', border: '1px solid #c9a22755' }}
-          >
-            <BookOpen size={20} />
-          </button>
-          <button
-            onClick={() => setView('stats')}
-            className={`px-4 py-2.5 rounded-full flex items-center gap-1 btn-raised-sm ${view === 'stats' ? 'btn-pressed-sm' : ''}`}
-            style={{ background: view === 'stats' ? '#e8dbc3' : '#131b46', color: view === 'stats' ? '#0a0f2e' : '#c9a227', border: '1px solid #c9a22755' }}
-          >
-            <BarChart2 size={20} />
-          </button>
-          <button
-            onClick={() => setView('guide')}
-            className={`px-4 py-2.5 rounded-full flex items-center gap-1 btn-raised-sm ${view === 'guide' ? 'btn-pressed-sm' : ''}`}
-            style={{ background: view === 'guide' ? '#e8dbc3' : '#131b46', color: view === 'guide' ? '#0a0f2e' : '#c9a227', border: '1px solid #c9a22755' }}
-          >
-            <Ruler size={20} />
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -1068,7 +1454,7 @@ function CigarBackdropArt() {
   );
   return (
     <svg
-      className="absolute inset-0 w-full h-full"
+      className="absolute inset-0 w-full h-full th-backdrop"
       viewBox="0 0 400 800"
       preserveAspectRatio="xMidYMid slice"
       style={{ opacity: 0.16, mixBlendMode: 'soft-light', pointerEvents: 'none' }}
@@ -1103,7 +1489,142 @@ function CigarBackdropArt() {
   );
 }
 
-function ListView({ entries, query, setQuery, onOpen, total }) {
+// Photo slot for the Journal list and grid. Gray shimmer until the photo has arrived,
+// then the photo fades in. Entries with no photo (or whose photo failed to load) show
+// the camera icon.
+function EntryPhoto({ src, hasPhoto, className = '', style, iconSize = 18 }) {
+  const [ready, setReady] = useState(false);
+  if (!hasPhoto || src === null) {
+    return (
+      <div className={`${className} flex items-center justify-center`} style={{ background: '#131b46', ...style }}>
+        <Camera size={iconSize} style={{ color: '#696c80' }} />
+      </div>
+    );
+  }
+  return (
+    <div className={`${className} relative overflow-hidden`} style={style}>
+      {!ready && <div className="absolute inset-0 th-shimmer" />}
+      {typeof src === 'string' && (
+        <img
+          src={src}
+          alt=""
+          className="w-full h-full object-cover"
+          onLoad={() => setReady(true)}
+          style={{ opacity: ready ? 1 : 0, transition: 'opacity 0.5s ease' }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Gray placeholder shapes shown while a page of entries is loading. Same shape and
+// size as the real rows / tiles so nothing jumps when the real ones replace them.
+function ListSkeleton({ mode, count }) {
+  if (mode === 'grid') {
+    return (
+      <div className="grid grid-cols-3 gap-2" aria-hidden="true">
+        {Array.from({ length: count }).map((_, i) => (
+          <div key={i} className="rounded-lg th-shimmer" style={{ aspectRatio: '1 / 1', border: '1px solid #131a43' }} />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-3" aria-hidden="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+          <div className="w-14 h-14 rounded-lg shrink-0 th-shimmer" />
+          <div className="flex-1 min-w-0">
+            <div className="rounded th-shimmer" style={{ height: 16, width: '60%' }} />
+            <div className="rounded th-shimmer" style={{ height: 12, width: '40%', marginTop: 8 }} />
+          </div>
+          <div className="rounded-full shrink-0 th-shimmer" style={{ width: 44, height: 44 }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// 1 2 3 ... 12 style page list: always the first and last page plus the current page
+// and its neighbors, with "..." where pages are skipped.
+function pageWindow(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const shown = [...new Set([1, current - 1, current, current + 1, total])]
+    .filter((p) => p >= 1 && p <= total)
+    .sort((a, b) => a - b);
+  const out = [];
+  shown.forEach((p, i) => {
+    if (i && p - shown[i - 1] > 1) out.push('...');
+    out.push(p);
+  });
+  return out;
+}
+
+function Pager({ page, pages, total, loading, onPage }) {
+  if (pages <= 1) return null;
+  const start = (page - 1) * PAGE_SIZE + 1;
+  const end = Math.min(page * PAGE_SIZE, total);
+  const btn = (active) => ({
+    minWidth: 40,
+    height: 40,
+    padding: '0 8px',
+    background: active ? '#e8dbc3' : '#131b46',
+    color: active ? '#0a0f2e' : '#c9a227',
+    border: '1px solid #c9a22755',
+    fontWeight: 600,
+    fontSize: 14,
+    opacity: loading && !active ? 0.6 : 1,
+  });
+  return (
+    <div className="text-center mt-5" role="navigation" aria-label="Journal pages">
+      <div className="text-xs mb-2.5" style={{ color: '#8d91a8' }} role="status">
+        {loading ? `Loading page ${page} of ${pages}...` : `Showing ${start} to ${end} of ${total}`}
+      </div>
+      <div className="flex items-center justify-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onPage(page - 1)}
+          disabled={page <= 1 || loading}
+          aria-label="Previous page"
+          className="rounded-xl flex items-center justify-center btn-raised-sm"
+          style={{ ...btn(false), opacity: page <= 1 || loading ? 0.35 : 1 }}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        {pageWindow(page, pages).map((p, i) =>
+          p === '...' ? (
+            <span key={`gap-${i}`} style={{ color: '#8d91a8', padding: '0 2px' }}>...</span>
+          ) : (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onPage(p)}
+              disabled={loading}
+              aria-label={`Page ${p}`}
+              aria-current={p === page ? 'page' : undefined}
+              className={`rounded-xl flex items-center justify-center btn-raised-sm ${p === page ? 'btn-pressed-sm' : ''}`}
+              style={btn(p === page)}
+            >
+              {p}
+            </button>
+          )
+        )}
+        <button
+          type="button"
+          onClick={() => onPage(page + 1)}
+          disabled={page >= pages || loading}
+          aria-label="Next page"
+          className="rounded-xl flex items-center justify-center btn-raised-sm"
+          style={{ ...btn(false), opacity: page >= pages || loading ? 0.35 : 1 }}
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ListView({ entries, query, setQuery, onOpen, total, page, pages, loading, onPage, resolvePhoto }) {
   // 'list': the original detailed row layout. 'grid': a photo-wall of square tiles
   // (mostly photo, gold rating badge in the corner). Persisted to localStorage so the
   // choice sticks across app opens instead of always starting back on list view.
@@ -1112,6 +1633,9 @@ function ListView({ entries, query, setQuery, onOpen, total }) {
     setViewModeState(mode);
     storeViewMode(mode);
   };
+
+  const searching = query.trim().length > 0;
+  const skeletonCount = total > 0 ? Math.min(PAGE_SIZE, Math.max(1, total - (page - 1) * PAGE_SIZE)) : 6;
 
   return (
     <div className="px-5 pt-4 relative">
@@ -1156,11 +1680,17 @@ function ListView({ entries, query, setQuery, onOpen, total }) {
         </div>
       </div>
 
-      {total === 0 ? (
+      {!loading && !searching && total === 0 ? (
         <EmptyState text="Your humidor is empty. Log your first cigar to start the journal." />
-      ) : entries.length === 0 ? (
+      ) : !loading && entries.length === 0 ? (
         <EmptyState text="No entries match that search." />
+      ) : loading ? (
+        <>
+          <ListSkeleton mode={viewMode} count={skeletonCount} />
+          <Pager page={page} pages={pages} total={total} loading onPage={onPage} />
+        </>
       ) : (
+        <>
         <div style={{ position: 'relative', overflow: 'hidden' }}>
           {/* Grid <-> list toggle transition, symmetric both directions:
               whichever view is exiting slides up + fades out over 600ms,
@@ -1191,13 +1721,7 @@ function ListView({ entries, query, setQuery, onOpen, total }) {
                     className="relative rounded-lg overflow-hidden btn-raised-sm"
                     style={{ aspectRatio: '1 / 1', border: '1px solid #131a43' }}
                   >
-                    {e.photo ? (
-                      <img src={e.photo} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center" style={{ background: '#131b46' }}>
-                        <Camera size={20} style={{ color: '#696c80' }} />
-                      </div>
-                    )}
+                    <EntryPhoto src={resolvePhoto(e)} hasPhoto={e.hasPhoto} className="w-full h-full" iconSize={20} />
                     <div
                       className="absolute bottom-1 right-1 font-serif font-semibold rounded-full"
                       style={{
@@ -1229,13 +1753,12 @@ function ListView({ entries, query, setQuery, onOpen, total }) {
                     className="flex items-center gap-3 p-3 rounded-xl text-left btn-raised-sm"
                     style={{ background: '#0a0f2e', border: '1px solid #131a43' }}
                   >
-                    {e.photo ? (
-                      <img src={e.photo} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" style={{ border: '1px solid #131a43' }} />
-                    ) : (
-                      <div className="w-14 h-14 rounded-lg shrink-0 flex items-center justify-center" style={{ background: '#131b46' }}>
-                        <Camera size={18} style={{ color: '#696c80' }} />
-                      </div>
-                    )}
+                    <EntryPhoto
+                      src={resolvePhoto(e)}
+                      hasPhoto={e.hasPhoto}
+                      className="w-14 h-14 rounded-lg shrink-0"
+                      style={{ border: '1px solid #131a43' }}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="font-serif font-semibold truncate" style={{ color: '#f3e9d8', fontSize: 16 }}>
                         {e.brand}
@@ -1250,6 +1773,8 @@ function ListView({ entries, query, setQuery, onOpen, total }) {
             )}
           </AnimatePresence>
         </div>
+        <Pager page={page} pages={pages} total={total} loading={false} onPage={onPage} />
+        </>
       )}
       </div>
     </div>
@@ -1278,6 +1803,8 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
   const [wrapper, setWrapper] = useState(initialEntry?.wrapper || '');
   const [binder, setBinder] = useState(initialEntry?.binder || '');
   const [filler, setFiller] = useState(initialEntry?.filler || '');
+  const [strength, setStrength] = useState(initialEntry?.strength ?? null);
+  const [body, setBody] = useState(initialEntry?.body ?? null);
   const [price, setPrice] = useState((initialEntry?.price || '').replace(/^\$\s*/, ''));
   const [pairing, setPairing] = useState(initialEntry?.pairing || '');
   const [rating, setRating] = useState(initialEntry?.rating ?? 3);
@@ -1329,6 +1856,8 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
       wrapper: wrapper.trim(),
       binder: binder.trim(),
       filler: filler.trim(),
+      strength,
+      body,
       price: price.trim(),
       pairing: pairing.trim(),
       rating,
@@ -1431,6 +1960,8 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
       <Field label="Filler">
         <input value={filler} onChange={(e) => setFiller(e.target.value)} placeholder="e.g. Nicaraguan, Dominican" style={inputStyle} />
       </Field>
+      <LevelSelect label="Strength" value={strength} onChange={setStrength} labels={['Mild', '', 'Medium', '', 'Bold']} />
+      <LevelSelect label="Body" value={body} onChange={setBody} labels={['Mild', '', 'Medium', '', 'Full']} />
       <Field label="Price">
         <div style={{ position: 'relative' }}>
           <span
@@ -1537,6 +2068,77 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
         >
           {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save entry'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Five selectable blocks (lightest to strongest) with labels under the first, middle and
+// last only. Used for Strength (Mild / Medium / Bold) and Body (Mild / Medium / Full).
+// Tapping the chosen block again clears it, so both stay optional.
+function LevelSelect({ label, value, onChange, labels }) {
+  const { effective } = useContext(A11yContext);
+  return (
+    <div role="radiogroup" aria-label={label}>
+      <div className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: '#c9a227' }}>{label}</div>
+      <div className="flex gap-1.5">
+        {STRENGTH_COLORS.map((color, i) => {
+          const on = value === i;
+          return (
+            <button
+              key={i}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-label={`${label} ${i + 1} of 5${labels[i] ? `, ${labels[i]}` : ''}`}
+              onClick={() => onChange(on ? null : i)}
+              className="flex-1 flex flex-col items-center gap-1.5"
+              style={{ color: on ? '#f3e9d8' : '#8d91a8', fontSize: 11, fontWeight: 600, lineHeight: 1.15 }}
+            >
+              <span
+                className="w-full rounded-lg"
+                style={{
+                  height: effective.tap ? 48 : 36,
+                  background: color,
+                  opacity: on ? 1 : 0.55,
+                  border: on ? '1px solid rgba(255,255,255,0.55)' : '1px solid #283268',
+                  boxShadow: on ? '0 0 0 2px rgba(255,255,255,0.2)' : 'none',
+                  transition: 'opacity 0.15s ease',
+                }}
+              />
+              <span>{labels[i] || ' '}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Read-only version of the same bar (entry details page).
+function LevelBar({ label, value, last }) {
+  return (
+    <div className="px-3 py-2.5 rounded-lg" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+      <div className="text-xs uppercase tracking-wide mb-2" style={{ color: '#c9a227' }}>{label}</div>
+      <div className="flex gap-1" role="img" aria-label={`${label} ${value + 1} of 5`}>
+        {STRENGTH_COLORS.map((color, i) => (
+          <span
+            key={i}
+            style={{
+              flex: 1,
+              height: 14,
+              borderRadius: 5,
+              background: color,
+              opacity: value === i ? 1 : 0.28,
+              boxShadow: value === i ? '0 0 0 2px rgba(255,255,255,0.45)' : 'none',
+            }}
+          />
+        ))}
+      </div>
+      <div className="mt-1.5" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', fontSize: 11, fontWeight: 600, color: '#8d91a8' }}>
+        <span>Mild</span>
+        <span>Medium</span>
+        <span style={{ textAlign: 'right' }}>{last}</span>
       </div>
     </div>
   );
@@ -1747,9 +2349,8 @@ function DetailView({ entry, onDelete, onEdit }) {
 
   return (
     <div className="px-5 pt-4">
-      {entry.photo && (
-        <img src={entry.photo} alt="" className="w-full h-56 object-cover rounded-xl mb-4" style={{ border: '1px solid #131a43' }} />
-      )}
+      {entry.photo === undefined && <div className="w-full h-56 rounded-xl mb-4 th-shimmer" aria-hidden="true" />}
+      {entry.photo && <DetailPhoto src={entry.photo} />}
       <div className="flex items-start justify-between mb-1">
         <div>
           <h2 className="font-serif font-semibold" style={{ fontSize: 24, color: '#f3e9d8' }}>{entry.brand}</h2>
@@ -1767,6 +2368,13 @@ function DetailView({ entry, onDelete, onEdit }) {
         {entry.price && <InfoChip label="Price" value={fmtPrice(entry.price)} />}
         {entry.pairing && <InfoChip label="Pairing" value={entry.pairing} />}
       </div>
+
+      {(entry.strength != null || entry.body != null) && (
+        <div className="flex flex-col gap-3 mb-4">
+          {entry.strength != null && <LevelBar label="Strength" value={entry.strength} last="Bold" />}
+          {entry.body != null && <LevelBar label="Body" value={entry.body} last="Full" />}
+        </div>
+      )}
 
       {entry.thirds && (entry.thirds.first || entry.thirds.second || entry.thirds.final) && (
         <div className="mb-6 p-4 rounded-lg" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
@@ -1824,7 +2432,7 @@ function DetailView({ entry, onDelete, onEdit }) {
 
       <button
         onClick={handleDownload}
-        disabled={downloading}
+        disabled={downloading || entry.photo === undefined}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium mb-3 btn-raised"
         style={{ background: 'linear-gradient(155deg, #b5652f, #8a4f24)', color: '#f6ecd9', opacity: downloading ? 0.7 : 1 }}
       >
@@ -1871,11 +2479,35 @@ function DetailView({ entry, onDelete, onEdit }) {
   );
 }
 
+// Big photo on the entry details page; fades in once it has loaded.
+function DetailPhoto({ src }) {
+  const [ready, setReady] = useState(false);
+  return (
+    <img
+      src={src}
+      alt=""
+      onLoad={() => setReady(true)}
+      className="w-full h-56 object-cover rounded-xl mb-4"
+      style={{ border: '1px solid #131a43', opacity: ready ? 1 : 0, transition: 'opacity 0.5s ease' }}
+    />
+  );
+}
+
 function InfoChip({ label, value }) {
   return (
     <div className="px-3 py-2 rounded-lg" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
       <div className="text-xs uppercase tracking-wide" style={{ color: '#c9a227' }}>{label}</div>
       <div className="text-sm font-medium" style={{ color: '#f3e9d8' }}>{value}</div>
+    </div>
+  );
+}
+
+function StatsSkeleton() {
+  return (
+    <div className="px-5 pt-4 flex flex-col gap-5" aria-hidden="true">
+      <div className="rounded-xl th-shimmer" style={{ height: 86 }} />
+      <div className="rounded-xl th-shimmer" style={{ height: 230 }} />
+      <div className="rounded-xl th-shimmer" style={{ height: 340 }} />
     </div>
   );
 }
@@ -1887,11 +2519,13 @@ function StatsView({ entries, onOpenEntry }) {
   });
   const [selectedDay, setSelectedDay] = useState(null);
 
+  // null = still loading (Stats is the one place that needs every entry, so it loads them
+  // only when this tab is opened)
+  if (entries === null) return <StatsSkeleton />;
+
   if (entries.length === 0) {
     return <EmptyState text="Log a few cigars to see your stats here." />;
   }
-
-  const avgRating = (entries.reduce((s, e) => s + e.rating, 0) / entries.length).toFixed(1);
 
   // Top flavor notes — tallies every flavor tag tapped across all three thirds of every
   // entry (a fixed 40-tag vocabulary from the flavor wheel, so counts group cleanly with
@@ -1947,10 +2581,7 @@ function StatsView({ entries, onOpenEntry }) {
 
   return (
     <div className="px-5 pt-4 flex flex-col gap-5">
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Cigars logged" value={entries.length} />
-        <StatCard label="Avg rating" value={avgRating} suffix="/5" />
-      </div>
+      <StatCard label="Cigars logged" value={entries.length} />
 
       <div className="p-4 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
         <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>Top flavor notes</div>
@@ -2083,34 +2714,7 @@ function StatCard({ label, value, suffix }) {
   );
 }
 
-function GuideView({ userEmail, onLogout, onDeleteAccount }) {
-  const [confirming, setConfirming] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deletePin, setDeletePin] = useState('');
-  const [deleteBusy, setDeleteBusy] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
-
-  const closeDeleteModal = () => {
-    if (deleteBusy) return;
-    setShowDeleteModal(false);
-    setDeletePin('');
-    setDeleteError('');
-  };
-
-  const handleDeleteAccount = async () => {
-    if (deletePin.length !== 4 || deleteBusy) return;
-    setDeleteBusy(true);
-    setDeleteError('');
-    try {
-      await onDeleteAccount(deletePin);
-      // Success drops back to the sign-in screen via onLogout() inside
-      // onDeleteAccount — nothing left to update on this now-unmounted view.
-    } catch (e) {
-      setDeleteError(e.message || 'Could not delete your account — please try again.');
-      setDeleteBusy(false);
-    }
-  };
-
+function GuideView() {
   return (
     <div className="px-5 pt-4 pb-10 flex flex-col gap-6">
       <div>
@@ -2168,45 +2772,213 @@ function GuideView({ userEmail, onLogout, onDeleteAccount }) {
           />
         </div>
       </div>
+    </div>
+  );
+}
 
+// ---- Account tab: who is signed in, accessibility settings, delete account ----
+function A11yToggle({ on, onChange, disabled, label }) {
+  const { effective } = useContext(A11yContext);
+  const big = effective.tap;
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!on)}
+      className="shrink-0 relative rounded-full"
+      style={{
+        width: big ? 60 : 50,
+        height: big ? 36 : 30,
+        background: on ? '#c9a227' : '#2a3266',
+        border: '1px solid #283268',
+        opacity: disabled ? 0.55 : 1,
+        transition: 'background 0.2s ease',
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: 3,
+          left: on ? (big ? 27 : 23) : 3,
+          width: big ? 28 : 22,
+          height: big ? 28 : 22,
+          borderRadius: '50%',
+          background: on ? '#0a0f2e' : '#cfd2e6',
+          transition: 'left 0.2s ease',
+        }}
+      />
+    </button>
+  );
+}
+
+function A11yRow({ title, desc, tag, first, children }) {
+  return (
+    <div className="flex items-center gap-3 py-3.5 flex-wrap" style={{ borderTop: first ? 'none' : '1px solid #131a43' }}>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold" style={{ color: '#f3e9d8' }}>
+          {title}
+          {tag && (
+            <span className="ml-1.5 align-middle" style={{ fontSize: 10, color: '#c9a227', border: '1px solid #c9a227', borderRadius: 8, padding: '1px 6px' }}>
+              {tag}
+            </span>
+          )}
+        </div>
+        {desc && <div className="text-xs mt-0.5 leading-snug" style={{ color: '#8d91a8' }}>{desc}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function AccountView({ userEmail, onLogout, onDeleteAccount }) {
+  const { settings, effective, update } = useContext(A11yContext);
+  const [confirming, setConfirming] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePin, setDeletePin] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const matching = settings.match;
+  const deviceTag = matching ? 'Device' : null;
+  const panel = { background: '#0a0f2e', border: '1px solid #131a43' };
+  const initial = (userEmail || '?').trim().charAt(0).toUpperCase() || '?';
+
+  const closeDeleteModal = () => {
+    if (deleteBusy) return;
+    setShowDeleteModal(false);
+    setDeletePin('');
+    setDeleteError('');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deletePin.length !== 4 || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError('');
+    try {
+      await onDeleteAccount(deletePin);
+      // Success drops back to the sign-in screen via onLogout() inside
+      // onDeleteAccount — nothing left to update on this now-unmounted view.
+    } catch (e) {
+      setDeleteError(e.message || 'Could not delete your account — please try again.');
+      setDeleteBusy(false);
+    }
+  };
+
+  // Turning "match device" off keeps whatever is in effect right now as the starting
+  // point, so nothing visibly changes until the person picks something.
+  const setMatch = (on) =>
+    on ? update({ match: true }) : update({ match: false, contrast: effective.contrast, motion: effective.motion });
+
+  return (
+    <div className="px-5 pt-4 pb-10 flex flex-col gap-6">
       <div>
         <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>
-          Account
+          Signed in
         </div>
-        <div className="p-4 rounded-xl flex items-center justify-between gap-3" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wide mb-1" style={{ color: '#696c80' }}>Signed in as</div>
-            <div className="text-sm truncate" style={{ color: '#f3e9d8' }}>{userEmail}</div>
+        <div className="p-4 rounded-xl" style={panel}>
+          <div className="flex items-center gap-3.5">
+            <div
+              className="shrink-0 flex items-center justify-center rounded-full font-serif font-bold"
+              style={{ width: 44, height: 44, background: 'radial-gradient(circle at 30% 25%, #e2c25a, #9a7a14)', color: '#0a0f2e', fontSize: 18, border: '2px solid #f0d77f' }}
+            >
+              {initial}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs" style={{ color: '#8d91a8' }}>Logged in as</div>
+              <div className="text-sm font-semibold break-all" style={{ color: '#f3e9d8' }}>{userEmail}</div>
+            </div>
           </div>
           {confirming ? (
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 mt-3.5">
               <button
                 onClick={onLogout}
-                className="text-sm font-semibold px-3 py-1.5 rounded-lg btn-raised-sm"
+                className="flex-1 text-sm font-semibold px-3 py-2.5 rounded-lg btn-raised-sm"
                 style={{ color: '#f6ecd9', background: 'linear-gradient(155deg, #b5652f, #8a3a1e)' }}
               >
-                Confirm
+                Confirm log out
               </button>
-              <button
-                onClick={() => setConfirming(false)}
-                className="text-sm px-3 py-1.5 rounded-lg"
-                style={{ color: '#8d91a8' }}
-              >
+              <button onClick={() => setConfirming(false)} className="flex-1 text-sm px-3 py-2.5 rounded-lg" style={{ color: '#8d91a8' }}>
                 Cancel
               </button>
             </div>
           ) : (
             <button
               onClick={() => setConfirming(true)}
-              className="text-sm font-medium px-3 py-1.5 rounded-lg shrink-0"
+              className="w-full mt-3.5 text-sm font-medium px-3 py-2.5 rounded-lg"
               style={{ color: '#c9a227', border: '1px solid #c9a22755' }}
             >
               Log out
             </button>
           )}
         </div>
+      </div>
 
-        <div className="text-[9px] font-semibold uppercase tracking-wide mt-3 mb-1.5" style={{ color: '#d97066' }}>
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>
+          Accessibility
+        </div>
+
+        <div className="px-4 rounded-xl mb-2" style={panel}>
+          <A11yRow first title="Match device settings" desc="Text size, contrast and motion follow your phone. Turn off to set them yourself.">
+            <A11yToggle on={matching} onChange={setMatch} label="Match device settings" />
+          </A11yRow>
+        </div>
+
+        <div className="px-4 rounded-xl mb-2" style={panel}>
+          <A11yRow
+            first
+            title="Text size"
+            tag={deviceTag}
+            desc={matching ? "Uses your phone's own text size setting." : null}
+          >
+            {!matching && (
+              <div className="w-full flex rounded-lg p-1" style={{ background: '#080c26', border: '1px solid #131a43' }} role="radiogroup" aria-label="Text size">
+                {['Default', 'Large', 'Extra large'].map((label, i) => (
+                  <button
+                    key={label}
+                    type="button"
+                    role="radio"
+                    aria-checked={settings.text === i}
+                    onClick={() => update({ text: i })}
+                    className={`flex-1 py-2 rounded-md text-sm font-medium btn-raised-sm ${settings.text === i ? 'btn-pressed-sm' : ''}`}
+                    style={
+                      settings.text === i
+                        ? { background: 'linear-gradient(155deg, #f3e9d8, #e0d5b8)', color: '#0a0f2e' }
+                        : { background: '#0a0f2e', color: '#8d91a8' }
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </A11yRow>
+          <A11yRow title="High contrast" tag={deviceTag} desc="Lighter text, stronger borders and gold.">
+            <A11yToggle on={effective.contrast} disabled={matching} onChange={(v) => update({ contrast: v })} label="High contrast" />
+          </A11yRow>
+          <A11yRow title="Reduce motion" tag={deviceTag} desc="Turns off the splash spin, smoke and page flips.">
+            <A11yToggle on={effective.motion} disabled={matching} onChange={(v) => update({ motion: v })} label="Reduce motion" />
+          </A11yRow>
+        </div>
+
+        <div className="px-4 rounded-xl" style={panel}>
+          <A11yRow first title="Simplify background" desc="Flat navy instead of the photo and smoke texture.">
+            <A11yToggle on={settings.simple} onChange={(v) => update({ simple: v })} label="Simplify background" />
+          </A11yRow>
+          <A11yRow title="Larger tap targets" desc="Bigger buttons, stars, chips and nav bar.">
+            <A11yToggle on={settings.tap} onChange={(v) => update({ tap: v })} label="Larger tap targets" />
+          </A11yRow>
+          <A11yRow title="Show PIN while typing" desc="Shows digits instead of dots at sign-in and account deletion.">
+            <A11yToggle on={settings.pin} onChange={(v) => update({ pin: v })} label="Show PIN while typing" />
+          </A11yRow>
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[9px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#d97066' }}>
           Danger Zone
         </div>
         <div className="py-1.5 px-2.5 rounded-lg flex items-center justify-between gap-2" style={{ background: '#0a0f2e', border: '1px solid #3a2323' }}>
@@ -2226,7 +2998,8 @@ function GuideView({ userEmail, onLogout, onDeleteAccount }) {
       {/* Rendered through a portal straight to document.body, same reason as
           the AddView photo-source sheet: this view can sit inside an animated
           FlipPage wrapper, and a transform on that ancestor would otherwise
-          hijack what "fixed" positions against. */}
+          hijack what "fixed" positions against. z-50 puts it above the bottom
+          nav (z-40), so the whole screen dims, nav included. */}
       {showDeleteModal && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center px-5"
@@ -2234,7 +3007,7 @@ function GuideView({ userEmail, onLogout, onDeleteAccount }) {
           onClick={closeDeleteModal}
         >
           <div
-            className="w-full max-w-sm rounded-2xl p-6 text-center"
+            className="th-zoomable w-full max-w-sm rounded-2xl p-6 text-center"
             style={{ background: 'linear-gradient(180deg, #131b46, #0c1236)', border: '1px solid #283268' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2285,8 +3058,12 @@ function GuideView({ userEmail, onLogout, onDeleteAccount }) {
 
 // ---- authentication ----
 function PinInput({ value, onChange, autoFocus }) {
+  // Dots by default; "Show PIN while typing" (Account tab) reveals the digits.
+  const { effective } = useContext(A11yContext);
   return (
     <input
+      type={effective.pin ? 'text' : 'password'}
+      autoComplete="off"
       value={value}
       onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 4))}
       inputMode="numeric"
@@ -2662,7 +3439,7 @@ const FEATURES = [
   { path: 'M12 17.3l-5.4 3 1.4-6-4.7-4 6.1-.5L12 4l2.6 5.8 6.1.5-4.7 4 1.4 6z', title: 'Half-star ratings', body: 'Rate with real precision: tap the left or right half of any star, down to the 0.5.' },
   { path: 'M12 3v18M3 12h18', title: 'Flavor wheel, by the thirds', body: 'Separate tasting notes for the first, second, and final third, each with its own 10-category flavor wheel.', circle: true },
   { path: 'M3 9h18M8 2v4M16 2v4', title: 'Cigar Calendar', body: 'Every logged day shows the cigar itself, right on the calendar. Tap in to relive it.', rect: true },
-  { path: 'M7 15l4-4 3 3 5-6', title: 'Your stats', body: "Average rating, your top flavor notes, and a full Cigar Calendar of everything you've logged.", frame: true },
+  { path: 'M7 15l4-4 3 3 5-6', title: 'Your stats', body: "Your top flavor notes and a full Cigar Calendar of everything you've logged.", frame: true },
   { path: 'M12 3v12M8 8l4-5 4 5M5 21h14', title: 'Share an entry', body: 'Download any cigar as a beautiful shareable card: photo, rating, and notes, ready to post.' },
 ];
 
@@ -2854,7 +3631,7 @@ function LandingPage({ onCheckout, onLogin }) {
               <div className="phone" style={{ width: 220 }}>
                 <div className="phone-screen" style={{ minHeight: 400, paddingTop: 24 }}>
                   <div className="ph-title" style={{ fontSize: 13 }}>Stats</div>
-                  <div className="ph-sub" style={{ marginBottom: 10 }}>18 cigars · 4.3 avg</div>
+                  <div className="ph-sub" style={{ marginBottom: 10 }}>18 cigars logged</div>
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90, marginBottom: 14 }}>
                     <div style={{ flex: 1, height: '60%', background: 'var(--gold)', borderRadius: '4px 4px 0 0', opacity: .9 }}></div>
                     <div style={{ flex: 1, height: '90%', background: 'var(--gold)', borderRadius: '4px 4px 0 0' }}></div>
@@ -3661,6 +4438,9 @@ function AgeGate({ onVerified }) {
 
 // ---- top-level: gates the app behind authentication ----
 export default function App() {
+  // Accessibility settings apply everywhere, including the sign-in screens (PIN visibility),
+  // so they are provided here at the very top.
+  const a11y = useA11ySettings();
   const [auth, setAuth] = useState(() => getStoredAuth());
   const [ageVerified, setAgeVerified] = useState(() => getAgeVerified());
   const deviceIdRef = useRef(null);
@@ -3693,13 +4473,18 @@ export default function App() {
   // Existing accounts (a stored auth token) skip the age gate entirely --
   // it only ever stands between an unauthenticated visitor and the
   // marketing page, checkout, login, and signup screens.
+  let screen;
   if (!auth && !ageVerified) {
-    return <AgeGate onVerified={() => setAgeVerified(true)} />;
+    screen = <AgeGate onVerified={() => setAgeVerified(true)} />;
+  } else if (!auth) {
+    screen = <AuthFlow deviceId={deviceIdRef.current} claimToken={claimTokenRef.current} onAuthenticated={handleAuthenticated} />;
+  } else {
+    screen = <CigarJournal authToken={auth.token} userEmail={auth.email} onLogout={handleLogout} />;
   }
 
-  if (!auth) {
-    return <AuthFlow deviceId={deviceIdRef.current} claimToken={claimTokenRef.current} onAuthenticated={handleAuthenticated} />;
-  }
-
-  return <CigarJournal authToken={auth.token} userEmail={auth.email} onLogout={handleLogout} />;
+  return (
+    <A11yContext.Provider value={a11y}>
+      <MotionConfig reducedMotion={a11y.effective.motion ? 'always' : 'user'}>{screen}</MotionConfig>
+    </A11yContext.Provider>
+  );
 }
