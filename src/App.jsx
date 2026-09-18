@@ -754,10 +754,13 @@ function GlobalStyles() {
       background-size: auto, auto, cover;
       background-position: center, center, center 25%;
       background-repeat: no-repeat, no-repeat, no-repeat;
-      background-attachment: scroll, scroll, fixed;
+      /* Its own screen-sized fixed layer (see the JSX): painted once instead of being
+         re-painted on every scroll frame like background-attachment: fixed was. */
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      transform: translateZ(0);
     }
     .grain {
-      position: absolute; inset: 0; opacity: 0.05; mix-blend-mode: overlay; pointer-events: none;
+      position: fixed; inset: 0; transform: translateZ(0); opacity: 0.05; mix-blend-mode: overlay; pointer-events: none;
       background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     }
     input::placeholder, textarea::placeholder { color: #3c4576; }
@@ -903,12 +906,18 @@ function GlobalStyles() {
     }
 
     /* ---- loading placeholders (Journal list, Stats) ---- */
-    .th-shimmer {
-      background: linear-gradient(90deg, #131b46 0%, #222d6b 50%, #131b46 100%);
-      background-size: 200% 100%;
+    /* The moving highlight is a transform on a pseudo-element (runs on the GPU) instead of
+       animating background-position, which re-painted every placeholder on every frame. */
+    .th-shimmer { background: #131b46; overflow: hidden; }
+    .th-shimmer:not(.absolute) { position: relative; }
+    .th-shimmer::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent 0%, #222d6b 50%, transparent 100%);
+      transform: translateX(-100%);
       animation: thShimmer 1.3s linear infinite;
+      will-change: transform;
     }
-    @keyframes thShimmer { to { background-position: -200% 0; } }
+    @keyframes thShimmer { to { transform: translateX(100%); } }
 
     /* ---- bottom navigation ---- */
     .th-nav {
@@ -960,7 +969,8 @@ function GlobalStyles() {
     [data-th-contrast="1"] .th-nav-btn { color: #e6e8f3; }
     [data-th-contrast="1"] .th-nav-btn.th-active { color: #f5cf4a; }
     [data-th-contrast="1"] .th-nav-bar { border-top-color: #6f7ed0; }
-    [data-th-contrast="1"] .th-shimmer { background-image: linear-gradient(90deg, #26306a 0%, #3a4790 50%, #26306a 100%); }
+    [data-th-contrast="1"] .th-shimmer { background: #26306a; }
+    [data-th-contrast="1"] .th-shimmer::after { background: linear-gradient(90deg, transparent 0%, #3a4790 50%, transparent 100%); }
 
     /* Reduce motion: animations and transitions collapse to instant. The splash still
        shows (static) for a moment, same as the phone-level setting already did. */
@@ -1001,8 +1011,8 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [listLoading, setListLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
-  // Every entry, photos included. Only loaded when the Stats tab is opened (totals, flavor
-  // chart and the Cigar Calendar need all of them); cleared whenever an entry changes.
+  // Every entry (text only, photos come separately). Only loaded when the Stats tab is opened
+  // (totals, origin, palate and the Cigar Calendar need all of them); cleared whenever an entry changes.
   const [allEntries, setAllEntries] = useState(null);
   // Photos arrive separately from the list text, one at a time, and fade in as they land.
   // id -> data URL. false = the fetch failed (retried next time that page loads).
@@ -1144,7 +1154,9 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await authFetch(ENTRIES_API);
+        // photos=0: every entry's text without the photos (each carries hasPhoto). Photos are
+        // fetched one at a time only for what is on screen, so Stats loads and scrolls light.
+        const res = await authFetch(`${ENTRIES_API}?photos=0`);
         if (!res.ok) throw new Error('load failed');
         const data = await res.json();
         if (!cancelled) setAllEntries(data);
@@ -1259,6 +1271,13 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
     pageData.entries.find((e) => e.id === activeId) || (stashed && stashed.id === activeId ? stashed : null);
   const active = rawActive ? { ...rawActive, photo: resolvePhoto(rawActive) } : null;
 
+  // An entry opened from Stats arrives without its photo: fetch it (cache hit = instant).
+  useEffect(() => {
+    if (view === 'detail' && rawActive && rawActive.hasPhoto === true && photoCacheRef.current[rawActive.id] === undefined) {
+      fetchPhoto(rawActive.id);
+    }
+  }, [view, activeId]);
+
   // Editing needs the photo in hand (the form starts from it), so wait for it if it is still loading.
   const openEdit = async () => {
     if (active && active.photo === undefined) await fetchPhoto(active.id);
@@ -1275,8 +1294,10 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
       {showSplash && <SplashScreen />}
       <GlobalStyles />
 
-      <div className="app-shell min-h-screen w-full absolute inset-0" />
+      <div className="app-shell" />
       <div className="grain" />
+      {/* Cigar art behind the Journal list: a fixed, screen-sized layer, so it is painted once. */}
+      {view === 'list' && <CigarBackdropArt />}
 
       <div
         className="th-zoomable max-w-md mx-auto min-h-screen relative"
@@ -1320,6 +1341,8 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
                     setOriginPop(null);
                     openEntry(id, 'stats', (allEntries || []).find((e) => e.id === id) || null);
                   }}
+                  resolvePhoto={resolvePhoto}
+                  loadPhotos={loadPhotosFor}
                   originPart={originPart}
                   setOriginPart={setOriginPart}
                   originPop={originPop}
@@ -1408,6 +1431,9 @@ const FlipPage = React.forwardRef(function FlipPage({ children }, ref) {
         rotateX: 0,
         scale: 1,
         filter: 'brightness(1)',
+        // Once it has landed, drop the filter completely: a leftover filter keeps the whole
+        // page on its own heavy layer and makes scrolling choppy.
+        transitionEnd: { filter: 'none' },
         transition: { duration: 0.68, delay: 0.14, ease: [0.34, 1.56, 0.64, 1] },
       }}
       exit={{
@@ -1465,7 +1491,7 @@ function CigarBackdropArt() {
   );
   return (
     <svg
-      className="absolute inset-0 w-full h-full th-backdrop"
+      className="fixed inset-0 w-full h-full th-backdrop"
       viewBox="0 0 400 800"
       preserveAspectRatio="xMidYMid slice"
       style={{ opacity: 0.16, mixBlendMode: 'soft-light', pointerEvents: 'none' }}
@@ -1650,7 +1676,6 @@ function ListView({ entries, query, setQuery, onOpen, total, page, pages, loadin
 
   return (
     <div className="px-5 pt-4 relative">
-      <CigarBackdropArt />
       <div className="relative" style={{ zIndex: 1 }}>
       <div className="flex items-center gap-2 mb-4">
         <div className="relative flex-1">
@@ -2655,8 +2680,14 @@ function OriginCard({ entries, part, onPart, onPick }) {
 // the whole screen, bottom nav included. Everything is recomputed from the live entries,
 // so if a cigar is deleted or its wrapper is edited the list stays right, and the pop-up
 // closes itself when its row has no cigars left.
-function OriginSheet({ entries, pop, onClose, onOpen }) {
+function OriginSheet({ entries, pop, onClose, onOpen, resolvePhoto, loadPhotos }) {
   const row = useMemo(() => buildOrigin(entries, pop.part).rows.find((r) => r.key === pop.key) || null, [entries, pop]);
+  // Only the first 30 cigars are drawn (and their photos fetched); more are added as you
+  // scroll near the bottom, so a big list opens fast and scrolls light.
+  const [shown, setShown] = useState(30);
+  useEffect(() => {
+    if (row) loadPhotos(row.list.slice(0, shown));
+  }, [row, shown]);
   useEffect(() => {
     if (!row) onClose();
   }, [row]);
@@ -2701,8 +2732,14 @@ function OriginSheet({ entries, pop, onClose, onOpen }) {
             {row.list.length} cigar{row.list.length === 1 ? '' : 's'} by {partLabel} · average rating <span style={{ color: '#c9a227' }}>&#9733;</span> {avg.toFixed(1)}
           </div>
         </div>
-        <div className="overflow-y-auto px-3 py-3 flex flex-col gap-2">
-          {row.list.map((e) => (
+        <div
+          className="overflow-y-auto px-3 py-3 flex flex-col gap-2"
+          onScroll={(ev) => {
+            const el = ev.currentTarget;
+            if (shown < row.list.length && el.scrollTop + el.clientHeight > el.scrollHeight - 240) setShown((n) => n + 30);
+          }}
+        >
+          {row.list.slice(0, shown).map((e) => (
             <button
               key={e.id}
               type="button"
@@ -2710,13 +2747,7 @@ function OriginSheet({ entries, pop, onClose, onOpen }) {
               className="flex items-center gap-3 p-2 rounded-xl text-left btn-raised-sm"
               style={{ background: '#0a0f2e', border: '1px solid #131a43' }}
             >
-              {e.photo ? (
-                <img src={e.photo} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0" style={{ border: '1px solid #131a43' }} />
-              ) : (
-                <div className="w-11 h-11 rounded-lg shrink-0 flex items-center justify-center" style={{ background: '#131b46' }}>
-                  <Camera size={16} style={{ color: '#696c80' }} />
-                </div>
-              )}
+              <EntryPhoto src={resolvePhoto(e)} hasPhoto={e.hasPhoto} className="w-11 h-11 rounded-lg shrink-0" style={{ border: '1px solid #131a43' }} iconSize={16} />
               <div className="flex-1 min-w-0">
                 <div className="font-serif font-semibold truncate" style={{ color: '#f3e9d8', fontSize: 15 }}>{e.brand}</div>
                 <div className="text-xs truncate" style={{ color: '#8d91a8' }}>{e.name || e.vitola}</div>
@@ -2893,12 +2924,20 @@ function StatsSkeleton() {
   );
 }
 
-function StatsView({ entries, onOpenEntry, originPart, setOriginPart, originPop, setOriginPop, onOpenFromPop }) {
+function StatsView({ entries, onOpenEntry, resolvePhoto, loadPhotos, originPart, setOriginPart, originPop, setOriginPop, onOpenFromPop }) {
   const [calDate, setCalDate] = useState(() => {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
   });
   const [selectedDay, setSelectedDay] = useState(null);
+
+  // Photos for the month on screen (calendar tiles and the tapped-day list) are fetched
+  // one at a time, and only for that month.
+  useEffect(() => {
+    if (!entries) return;
+    const ym = `${calDate.year}-${String(calDate.month + 1).padStart(2, '0')}`;
+    loadPhotos(entries.filter((e) => e.hasPhoto && String(e.date).startsWith(ym)));
+  }, [entries, calDate]);
 
   // null = still loading (Stats is the one place that needs every entry, so it loads them
   // only when this tab is opened)
@@ -2979,17 +3018,20 @@ function StatsView({ entries, onOpenEntry, originPart, setOriginPart, originPop,
                 key={cell.dateStr}
                 onClick={() => handleDayClick(cell.dateStr, cell.dayEntries)}
                 disabled={!hasEntries}
-                className="rounded-lg relative"
+                className="rounded-lg relative overflow-hidden"
                 style={{
                   aspectRatio: '1 / 1',
-                  background: hasEntries
-                    ? (first.photo ? `url("${first.photo}") center/cover no-repeat` : '#131b46')
-                    : '#10163d',
+                  background: hasEntries ? '#131b46' : '#10163d',
                   outline: isToday ? '1px solid #c9a227' : 'none',
                   outlineOffset: -1,
                   cursor: hasEntries ? 'pointer' : 'default',
                 }}
               >
+                {hasEntries && first.hasPhoto && (
+                  <div className="absolute inset-0">
+                    <EntryPhoto src={resolvePhoto(first)} hasPhoto className="w-full h-full" iconSize={12} />
+                  </div>
+                )}
                 <span
                   className="font-semibold"
                   style={
@@ -3031,13 +3073,7 @@ function StatsView({ entries, onOpenEntry, originPart, setOriginPart, originPop,
                   className="flex items-center gap-3 p-3 rounded-xl text-left btn-raised-sm"
                   style={{ background: '#131b46', border: '1px solid #131a43' }}
                 >
-                  {e.photo ? (
-                    <img src={e.photo} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0" style={{ border: '1px solid #131a43' }} />
-                  ) : (
-                    <div className="w-11 h-11 rounded-lg shrink-0 flex items-center justify-center" style={{ background: '#0a0f2e' }}>
-                      <Camera size={16} style={{ color: '#696c80' }} />
-                    </div>
-                  )}
+                  <EntryPhoto src={resolvePhoto(e)} hasPhoto={e.hasPhoto} className="w-11 h-11 rounded-lg shrink-0" style={{ border: '1px solid #131a43' }} iconSize={16} />
                   <div className="flex-1 min-w-0">
                     <div className="font-serif font-semibold truncate" style={{ color: '#f3e9d8', fontSize: 15 }}>
                       {e.name || e.vitola || e.brand}
@@ -3053,7 +3089,7 @@ function StatsView({ entries, onOpenEntry, originPart, setOriginPart, originPop,
       </div>
 
       {originPop && (
-        <OriginSheet entries={entries} pop={originPop} onClose={() => setOriginPop(null)} onOpen={onOpenFromPop} />
+        <OriginSheet entries={entries} pop={originPop} onClose={() => setOriginPop(null)} onOpen={onOpenFromPop} resolvePhoto={resolvePhoto} loadPhotos={loadPhotos} />
       )}
     </div>
   );
@@ -3469,7 +3505,7 @@ function MarketingStyles() {
       .th-mkt a{ color:inherit; text-decoration:none; }
       .th-mkt .wrap{ max-width:1100px; margin:0 auto; padding:0 24px; }
 
-      .th-mkt header.th-nav{ position:sticky; top:0; z-index:5; background:rgba(6,9,26,.86);
+      .th-mkt header.th-topbar{ position:sticky; top:0; z-index:5; background:rgba(6,9,26,.86);
         backdrop-filter:blur(10px); border-bottom:1px solid var(--panel-border); }
       .th-mkt .nav-inner{ display:flex; align-items:center; justify-content:space-between;
         padding:12px 24px; max-width:1100px; margin:0 auto; }
@@ -3889,7 +3925,7 @@ function LandingPage({ onCheckout, onLogin }) {
     <div className="th-mkt">
       <GlobalStyles />
       <MarketingStyles />
-      <header className="th-nav">
+      <header className="th-topbar">
         <div className="nav-inner">
           <div className="brand">
             <div className="medallion"><span>TH</span></div>
@@ -4121,7 +4157,7 @@ function AuthShell({ children }) {
   return (
     <div className="min-h-screen w-full relative flex items-center justify-center px-6" style={{ fontFamily: "'Source Sans 3', ui-sans-serif, system-ui" }}>
       <GlobalStyles />
-      <div className="app-shell min-h-screen w-full absolute inset-0" />
+      <div className="app-shell" />
       <div className="grain" />
       <div className="w-full max-w-sm relative py-10">
         <div className="text-center mb-8">

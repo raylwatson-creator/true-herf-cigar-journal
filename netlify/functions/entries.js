@@ -110,6 +110,19 @@ export default async (req) => {
         });
       }
 
+      // GET ?photos=0 -> every entry WITHOUT photos (each carries hasPhoto), newest first.
+      // The Stats tab uses this: totals, origin, palate and the calendar only need the text,
+      // and it pulls the few photos it shows one at a time through ?photo=<id>.
+      if (params.get("photos") === "0") {
+        const slim = await db.sql`
+          SELECT id, data - 'photo' AS data, (data->>'photo') IS NOT NULL AS has_photo
+          FROM entries
+          WHERE user_id = ${userId}
+          ORDER BY created_at DESC
+        `;
+        return json(200, slim.map((r) => ({ id: r.id, ...r.data, hasPhoto: r.has_photo })));
+      }
+
       // GET with no params -> every entry, photos included. Kept exactly as it
       // was; the Stats tab (totals, flavor chart, Cigar Calendar) needs all of
       // them and only loads this when that tab is opened.
