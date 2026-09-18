@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Plus, Search, Camera, ChevronLeft, ChevronRight, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star, List, LayoutGrid, Share2, MoreVertical, Check, Smartphone } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 
@@ -1015,6 +1014,10 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
 
   const [view, setView] = useState('list');
   const [detailFrom, setDetailFrom] = useState('list');
+  // Stats > Where your tobacco comes from: which part is showing, and which row's pop-up is open.
+  // Kept here (not in StatsView) so the pop-up is still there when you come back from an entry.
+  const [originPart, setOriginPart] = useState('wrapper');
+  const [originPop, setOriginPop] = useState(null);
   const [activeId, setActiveId] = useState(null);
   // An entry opened from the Stats calendar (not part of the current list page).
   const [stashed, setStashed] = useState(null);
@@ -1313,7 +1316,15 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
               ) : view === 'stats' ? (
                 <StatsView
                   entries={allEntries}
-                  onOpenEntry={(id) => openEntry(id, 'stats', (allEntries || []).find((e) => e.id === id) || null)}
+                  onOpenEntry={(id) => {
+                    setOriginPop(null);
+                    openEntry(id, 'stats', (allEntries || []).find((e) => e.id === id) || null);
+                  }}
+                  originPart={originPart}
+                  setOriginPart={setOriginPart}
+                  originPop={originPop}
+                  setOriginPop={setOriginPop}
+                  onOpenFromPop={(id) => openEntry(id, 'stats', (allEntries || []).find((e) => e.id === id) || null)}
                 />
               ) : view === 'guide' ? (
                 <GuideView />
@@ -1327,7 +1338,7 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
         </div>
       </div>
 
-      <BottomNav tab={navTab} onSelect={(key) => go(key)} visible={navVisible} userEmail={userEmail} />
+      <BottomNav tab={navTab} onSelect={(key) => { setOriginPop(null); go(key); }} visible={navVisible} userEmail={userEmail} />
     </div>
   );
 }
@@ -2502,6 +2513,376 @@ function InfoChip({ label, value }) {
   );
 }
 
+// ---- Stats: "Where your tobacco comes from" ----
+// The wrapper / binder / filler fields are free text, so a place is recognised by keyword.
+// When more than one place is named, whichever comes first in the text is the one counted.
+// Text with no recognisable place (a blend, or just a style like "Habano") counts as Other.
+const ORIGIN_OTHER = 'Other or blends';
+const ORIGIN_TABLE = [
+  ['Nicaragua', '#b5652f', ['nicaragua', 'nicaraguan', 'nica', 'esteli', 'jalapa', 'condega', 'ometepe']],
+  ['Dominican Republic', '#c9a227', ['dominican', 'dominicana', 'dom rep', 'dr', 'cibao', 'santiago']],
+  ['Honduras', '#7a9a5a', ['honduras', 'honduran', 'jamastran', 'danli', 'olancho']],
+  ['Mexico', '#a68bc9', ['mexico', 'mexican', 'san andres', 'tuxtla']],
+  ['Ecuador', '#6b4226', ['ecuador', 'ecuadorian', 'ecuadorean']],
+  ['United States', '#e6d3a8', ['usa', 'united states', 'american', 'connecticut', 'broadleaf', 'pennsylvania']],
+  ['Brazil', '#a3773f', ['brazil', 'brazilian', 'brasil', 'mata fina', 'arapiraca']],
+  ['Cameroon', '#b5583f', ['cameroon']],
+  ['Indonesia', '#8a9aa8', ['indonesia', 'indonesian', 'java', 'sumatra']],
+  ['Peru', '#c98a3f', ['peru', 'peruvian']],
+  ['Costa Rica', '#5f8f8a', ['costa rica']],
+  ['Panama', '#7d6fa8', ['panama']],
+  ['Cuba', '#b5652f', ['cuba']],
+  ['Italy', '#9aa06a', ['italy', 'italian']],
+].map(([label, color, words]) => ({
+  label,
+  color,
+  re: new RegExp(`\\b(?:${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`),
+}));
+const ORIGIN_OTHER_COLOR = '#696c80';
+const ORIGIN_PARTS = [
+  { key: 'wrapper', label: 'Wrapper' },
+  { key: 'binder', label: 'Binder' },
+  { key: 'filler', label: 'Filler' },
+];
+const ORIGIN_MIN_ENTRIES = 5;
+
+function originOf(text) {
+  const t = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  let best = null;
+  ORIGIN_TABLE.forEach((o) => {
+    const m = o.re.exec(t);
+    if (m && (best === null || m.index < best.index)) best = { index: m.index, origin: o };
+  });
+  return best ? best.origin : null;
+}
+
+// Top three places for one part, then everything else rolled into "Other or blends".
+// Only entries where that field is filled in are counted.
+function buildOrigin(entries, part) {
+  const filled = entries.filter((e) => String(e[part] || '').trim());
+  const groups = new Map();
+  const otherList = [];
+  filled.forEach((e) => {
+    const o = originOf(e[part]);
+    if (!o) return otherList.push(e);
+    if (!groups.has(o.label)) groups.set(o.label, { key: o.label, label: o.label, color: o.color, list: [] });
+    groups.get(o.label).list.push(e);
+  });
+  const named = [...groups.values()].sort((a, b) => b.list.length - a.list.length || a.label.localeCompare(b.label));
+  const rows = named.slice(0, 3);
+  const rest = [...named.slice(3).flatMap((g) => g.list), ...otherList];
+  if (rest.length) rows.push({ key: ORIGIN_OTHER, label: ORIGIN_OTHER, color: ORIGIN_OTHER_COLOR, list: rest });
+  rows.forEach((r) => r.list.sort((a, b) => String(b.date).localeCompare(String(a.date))));
+  return { total: filled.length, rows };
+}
+
+function StatSeg({ options, value, onChange, label }) {
+  return (
+    <div className="flex rounded-lg p-1" style={{ background: '#080c26', border: '1px solid #131a43' }} role="radiogroup" aria-label={label}>
+      {options.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          role="radio"
+          aria-checked={value === o.key}
+          onClick={() => onChange(o.key)}
+          className={`flex-1 py-2 rounded-md text-xs font-semibold btn-raised-sm ${value === o.key ? 'btn-pressed-sm' : ''}`}
+          style={value === o.key ? { background: 'linear-gradient(155deg, #f3e9d8, #e0d5b8)', color: '#0a0f2e' } : { background: '#0a0f2e', color: '#8d91a8' }}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function OriginCard({ entries, part, onPart, onPick }) {
+  const data = useMemo(() => buildOrigin(entries, part), [entries, part]);
+  const partLabel = ORIGIN_PARTS.find((p) => p.key === part).label;
+  const max = Math.max(1, ...data.rows.map((r) => r.list.length));
+  return (
+    <div className="p-4 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+      <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#c9a227' }}>Where your tobacco comes from</div>
+      <div className="text-xs mt-1 mb-3" style={{ color: '#8d91a8' }}>Grouped from the {part} you type on each entry.</div>
+      <StatSeg options={ORIGIN_PARTS} value={part} onChange={onPart} label="Tobacco part" />
+
+      {data.total < ORIGIN_MIN_ENTRIES ? (
+        <div className="text-center text-sm leading-relaxed px-2 pt-6 pb-3" style={{ color: '#8d91a8' }}>
+          <div className="font-serif font-semibold" style={{ color: '#c9a227', fontSize: 28 }}>{data.total}</div>
+          Fill in the {partLabel} field on at least {ORIGIN_MIN_ENTRIES} cigars and this chart will show where your tobacco is grown.
+          <div className="text-xs mt-2">{data.total} cigar{data.total === 1 ? '' : 's'} with a {part} listed so far.</div>
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-0.5 rounded-lg overflow-hidden my-4" style={{ height: 16 }} aria-hidden="true">
+            {data.rows.map((r) => (
+              <div key={r.key} style={{ width: `${(100 * r.list.length) / data.total}%`, background: r.color }} />
+            ))}
+          </div>
+          <div className="flex flex-col gap-1">
+            {data.rows.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                onClick={() => onPick(r.key)}
+                aria-label={`${r.label}, ${r.list.length} cigars. Show them.`}
+                className="text-left rounded-xl px-2 py-2"
+                style={{ border: '1px solid transparent' }}
+              >
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="flex items-center gap-2 text-sm font-semibold min-w-0" style={{ color: '#f3e9d8' }}>
+                    <span className="shrink-0 rounded-full" style={{ width: 10, height: 10, background: r.color }} />
+                    <span className="truncate">{r.label}</span>
+                  </span>
+                  <span className="flex items-center text-xs shrink-0" style={{ color: '#8d91a8' }}>
+                    {r.list.length} cigar{r.list.length === 1 ? '' : 's'} · {Math.round((100 * r.list.length) / data.total)}%
+                    <ChevronRight size={14} style={{ color: '#696c80', marginLeft: 4 }} />
+                  </span>
+                </div>
+                <div className="rounded" style={{ height: 8, background: '#131b46', overflow: 'hidden' }}>
+                  <div style={{ width: `${(100 * r.list.length) / max}%`, height: '100%', background: r.color, borderRadius: 4 }} />
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Pop-up listing the cigars behind one row. Rendered through a portal at z-50 so it dims
+// the whole screen, bottom nav included. Everything is recomputed from the live entries,
+// so if a cigar is deleted or its wrapper is edited the list stays right, and the pop-up
+// closes itself when its row has no cigars left.
+function OriginSheet({ entries, pop, onClose, onOpen }) {
+  const row = useMemo(() => buildOrigin(entries, pop.part).rows.find((r) => r.key === pop.key) || null, [entries, pop]);
+  useEffect(() => {
+    if (!row) onClose();
+  }, [row]);
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, []);
+  if (!row) return null;
+  const avg = row.list.reduce((s, e) => s + (Number(e.rating) || 0), 0) / row.list.length;
+  const partLabel = ORIGIN_PARTS.find((p) => p.key === pop.part).label.toLowerCase();
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-5" style={{ background: 'rgba(4,6,20,0.72)' }} onClick={onClose}>
+      <div
+        className="th-zoomable w-full max-w-sm rounded-2xl flex flex-col overflow-hidden"
+        style={{ maxHeight: '78vh', background: 'linear-gradient(180deg, #131b46, #0c1236)', border: '1px solid #283268' }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${row.label} cigars`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative px-4 pt-4 pb-3" style={{ borderBottom: '1px solid #131a43' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute flex items-center justify-center rounded-full"
+            style={{ right: 12, top: 12, width: 30, height: 30, background: '#0a0f2e', border: '1px solid #283268', color: '#c9a227' }}
+          >
+            <X size={16} />
+          </button>
+          <div className="flex items-center gap-2 font-serif font-semibold pr-10" style={{ color: '#f3e9d8', fontSize: 18 }}>
+            <span className="shrink-0 rounded-full" style={{ width: 10, height: 10, background: row.color }} />
+            {row.label}
+          </div>
+          <div className="text-xs mt-1" style={{ color: '#8d91a8' }}>
+            {row.list.length} cigar{row.list.length === 1 ? '' : 's'} by {partLabel} · average rating <span style={{ color: '#c9a227' }}>&#9733;</span> {avg.toFixed(1)}
+          </div>
+        </div>
+        <div className="overflow-y-auto px-3 py-3 flex flex-col gap-2">
+          {row.list.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              onClick={() => onOpen(e.id)}
+              className="flex items-center gap-3 p-2 rounded-xl text-left btn-raised-sm"
+              style={{ background: '#0a0f2e', border: '1px solid #131a43' }}
+            >
+              {e.photo ? (
+                <img src={e.photo} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0" style={{ border: '1px solid #131a43' }} />
+              ) : (
+                <div className="w-11 h-11 rounded-lg shrink-0 flex items-center justify-center" style={{ background: '#131b46' }}>
+                  <Camera size={16} style={{ color: '#696c80' }} />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="font-serif font-semibold truncate" style={{ color: '#f3e9d8', fontSize: 15 }}>{e.brand}</div>
+                <div className="text-xs truncate" style={{ color: '#8d91a8' }}>{e.name || e.vitola}</div>
+                <div className="text-xs" style={{ color: '#696c80' }}>{fmtDate(e.date)}</div>
+              </div>
+              <div className="font-serif font-semibold rounded-full shrink-0" style={{ color: '#f3e9d8', fontSize: 13, border: '1px solid #c9a22766', padding: '3px 9px', background: '#0a0f2e' }}>
+                {Number(e.rating || 0).toFixed(1)}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ---- Stats: Palate wheel ----
+// One wedge per flavor category; a wedge's length is how often that category's tags were
+// picked, across all three thirds or just one. Tap a wedge to see its four flavors.
+const PALATE_MIN_CIGARS = 3;
+const PALATE_THIRDS = [
+  { key: 'all', label: 'All' },
+  { key: 'first', label: 'First' },
+  { key: 'second', label: 'Second' },
+  { key: 'final', label: 'Final' },
+];
+const PALATE_THIRD_TEXT = { all: 'across all thirds', first: 'in the first third', second: 'in the second third', final: 'in the final third' };
+
+function polarXY(cx, cy, r, a) {
+  return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+}
+function wedgePath(cx, cy, r0, r1, a0, a1) {
+  const [x0, y0] = polarXY(cx, cy, r1, a0);
+  const [x1, y1] = polarXY(cx, cy, r1, a1);
+  const [x2, y2] = polarXY(cx, cy, r0, a1);
+  const [x3, y3] = polarXY(cx, cy, r0, a0);
+  return `M${x0} ${y0}A${r1} ${r1} 0 0 1 ${x1} ${y1}L${x2} ${y2}A${r0} ${r0} 0 0 0 ${x3} ${y3}Z`;
+}
+
+function PalateCard({ entries }) {
+  const [third, setThird] = useState('all');
+  const [picked, setPicked] = useState(null);
+
+  // tally[category][flavor] = [first, second, final]
+  const { tally, taggedCigars } = useMemo(() => {
+    const t = {};
+    FLAVOR_CATEGORIES.forEach((c) => {
+      t[c.key] = {};
+      c.flavors.forEach((f) => (t[c.key][f] = [0, 0, 0]));
+    });
+    let tagged = 0;
+    entries.forEach((e) => {
+      let any = false;
+      ['first', 'second', 'final'].forEach((k, i) => {
+        (e.thirdsFlavors?.[k] || []).forEach((f) => {
+          FLAVOR_CATEGORIES.forEach((c) => {
+            if (t[c.key][f]) {
+              t[c.key][f][i] += 1;
+              any = true;
+            }
+          });
+        });
+      });
+      if (any) tagged += 1;
+    });
+    return { tally: t, taggedCigars: tagged };
+  }, [entries]);
+
+  const shortLabel = (c) => c.label.replace(' Flavors', '');
+  const idx = { first: 0, second: 1, final: 2 };
+  const val = (a) => (third === 'all' ? a[0] + a[1] + a[2] : a[idx[third]]);
+  const cats = FLAVOR_CATEGORIES.map((c) => ({ ...c, v: Object.values(tally[c.key]).reduce((s, a) => s + val(a), 0) }));
+  const total = cats.reduce((s, c) => s + c.v, 0);
+  const max = Math.max(1, ...cats.map((c) => c.v));
+  const strongest = total ? [...cats].sort((a, b) => b.v - a.v)[0] : null;
+  const selKey = picked || (strongest ? strongest.key : cats[0].key);
+  const sel = cats.find((c) => c.key === selKey);
+  const flavors = Object.entries(tally[selKey]).map(([n, a]) => [n, val(a)]).sort((a, b) => b[1] - a[1]);
+  const fmax = Math.max(1, ...flavors.map((f) => f[1]));
+
+  const cx = 160, cy = 160, r0 = 44, rmax = 118, n = cats.length, gap = 0.03;
+
+  return (
+    <div className="p-4 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+      <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#c9a227' }}>Your palate</div>
+
+      {taggedCigars < PALATE_MIN_CIGARS ? (
+        <div className="text-center text-sm leading-relaxed px-2 pt-6 pb-3" style={{ color: '#8d91a8' }}>
+          <div className="font-serif font-semibold" style={{ color: '#c9a227', fontSize: 28 }}>{taggedCigars} of {PALATE_MIN_CIGARS}</div>
+          Add flavor tags to a few cigars to see your palate.
+          <div className="text-xs mt-2">Tag flavors in the first, second or final third when you log a cigar. {taggedCigars} cigar{taggedCigars === 1 ? ' has' : 's have'} tags so far.</div>
+        </div>
+      ) : (
+        <>
+          <div className="text-xs mt-1 mb-3" style={{ color: '#8d91a8' }}>The longer a wedge, the more often you taste it.</div>
+          <StatSeg options={PALATE_THIRDS} value={third} onChange={setThird} label="Cigar third" />
+          <svg viewBox="0 0 320 320" role="group" aria-label="Palate wheel" style={{ display: 'block', margin: '8px auto 0', width: '100%', maxWidth: 320, height: 'auto' }}>
+            {[0.33, 0.66, 1].map((f) => (
+              <circle key={f} cx={cx} cy={cy} r={r0 + (rmax - r0) * f} fill="none" stroke="#131a43" strokeDasharray="2 4" />
+            ))}
+            {cats.map((c, i) => {
+              const a0 = -Math.PI / 2 + (i * 2 * Math.PI) / n + gap;
+              const a1 = -Math.PI / 2 + ((i + 1) * 2 * Math.PI) / n - gap;
+              const r1 = r0 + Math.max(4, ((rmax - r0) * c.v) / max);
+              const [lx, ly] = polarXY(cx, cy, rmax + 16, (a0 + a1) / 2);
+              const on = c.key === selKey;
+              return (
+                <g key={c.key}>
+                  <path d={wedgePath(cx, cy, r0, rmax, a0, a1)} fill="#0d1334" />
+                  <path
+                    d={wedgePath(cx, cy, r0, r1, a0, a1)}
+                    fill={c.color}
+                    opacity={on ? 1 : 0.72}
+                    stroke={on ? '#f3e9d8' : 'none'}
+                    strokeWidth="1.5"
+                    style={{ cursor: 'pointer' }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${shortLabel(c)}, ${c.v} tags`}
+                    onClick={() => setPicked(c.key)}
+                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setPicked(c.key)}
+                  />
+                  <text x={lx} y={ly} fill={on ? '#f3e9d8' : '#8d91a8'} fontSize="10" fontWeight="600" textAnchor="middle" dominantBaseline="middle">
+                    {shortLabel(c)}
+                  </text>
+                </g>
+              );
+            })}
+            <circle cx={cx} cy={cy} r={r0 - 4} fill="#06091a" stroke="#283268" />
+            <text x={cx} y={cy - 4} fill="#f3e9d8" fontFamily="Fraunces, serif" fontSize="20" fontWeight="600" textAnchor="middle">{total}</text>
+            <text x={cx} y={cy + 12} fill="#8d91a8" fontSize="9" textAnchor="middle">tags</text>
+          </svg>
+
+          <div className="mt-2 pt-3" style={{ borderTop: '1px solid #131a43', minHeight: 118 }}>
+            <div className="flex items-center gap-2 font-serif font-semibold" style={{ color: '#f3e9d8', fontSize: 17 }}>
+              <span className="rounded-full" style={{ width: 12, height: 12, background: sel.color }} />
+              {shortLabel(sel)}
+            </div>
+            {total === 0 ? (
+              <div className="text-xs mt-1" style={{ color: '#8d91a8' }}>No flavors tagged {PALATE_THIRD_TEXT[third]} yet.</div>
+            ) : (
+              <>
+                <div className="text-xs mt-0.5 mb-2.5" style={{ color: '#8d91a8' }}>
+                  {Math.round((100 * sel.v) / total)}% of your tags {PALATE_THIRD_TEXT[third]}
+                  {strongest && strongest.key === sel.key ? ' · your strongest note' : ''}
+                </div>
+                {flavors.map(([name, count]) => (
+                  <div key={name} className="flex items-center gap-2 text-sm mb-1.5">
+                    <span style={{ width: 100, color: '#e8dbc3' }}>{name}</span>
+                    <span className="flex-1 rounded" style={{ height: 8, background: '#131b46', overflow: 'hidden' }}>
+                      <span style={{ display: 'block', width: `${(100 * count) / fmax}%`, height: '100%', background: sel.color, borderRadius: 4 }} />
+                    </span>
+                    <span className="text-xs text-right" style={{ width: 26, color: '#8d91a8' }}>{count}</span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+          <div className="text-center mt-1.5" style={{ fontSize: 11, color: '#696c80' }}>Wheel is built from the flavor tags you pick in each third.</div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function StatsSkeleton() {
   return (
     <div className="px-5 pt-4 flex flex-col gap-5" aria-hidden="true">
@@ -2512,7 +2893,7 @@ function StatsSkeleton() {
   );
 }
 
-function StatsView({ entries, onOpenEntry }) {
+function StatsView({ entries, onOpenEntry, originPart, setOriginPart, originPop, setOriginPop, onOpenFromPop }) {
   const [calDate, setCalDate] = useState(() => {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
@@ -2526,25 +2907,6 @@ function StatsView({ entries, onOpenEntry }) {
   if (entries.length === 0) {
     return <EmptyState text="Log a few cigars to see your stats here." />;
   }
-
-  // Top flavor notes — tallies every flavor tag tapped across all three thirds of every
-  // entry (a fixed 40-tag vocabulary from the flavor wheel, so counts group cleanly with
-  // no near-duplicate labels), then keeps the 5 most common. Replaces the old "Top brands"
-  // chart, which counted entries by brand name instead.
-  const flavorCounts = {};
-  entries.forEach((e) => {
-    ['first', 'second', 'final'].forEach((third) => {
-      (e.thirdsFlavors?.[third] || []).forEach((flavor) => {
-        flavorCounts[flavor] = (flavorCounts[flavor] || 0) + 1;
-      });
-    });
-  });
-  const topFlavors = Object.entries(flavorCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([name, count]) => ({ name, count }));
-
-  const tooltipStyle = { fontSize: 12, borderRadius: 8, background: '#131b46', border: '1px solid #1b2455', color: '#f3e9d8' };
 
   // Cigar Calendar: entries grouped by their logged date (YYYY-MM-DD, same key the
   // date input already stores), so the currently-displayed month can look each day up directly.
@@ -2583,18 +2945,9 @@ function StatsView({ entries, onOpenEntry }) {
     <div className="px-5 pt-4 flex flex-col gap-5">
       <StatCard label="Cigars logged" value={entries.length} />
 
-      <div className="p-4 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
-        <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>Top flavor notes</div>
-        <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={topFlavors} margin={{ left: -20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#131a43" />
-            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#8d91a8' }} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#8d91a8' }} />
-            <Tooltip contentStyle={tooltipStyle} />
-            <Bar dataKey="count" fill="#b5652f" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <OriginCard entries={entries} part={originPart} onPart={setOriginPart} onPick={(key) => setOriginPop({ part: originPart, key })} />
+
+      <PalateCard entries={entries} />
 
       <div className="p-4 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
         <div className="flex items-center justify-between mb-3">
@@ -2699,6 +3052,9 @@ function StatsView({ entries, onOpenEntry }) {
         )}
       </div>
 
+      {originPop && (
+        <OriginSheet entries={entries} pop={originPop} onClose={() => setOriginPop(null)} onOpen={onOpenFromPop} />
+      )}
     </div>
   );
 }
