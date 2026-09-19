@@ -4056,8 +4056,87 @@ function A11yRow({ title, desc, tag, first, children }) {
   );
 }
 
-function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPhoto }) {
+// Account > Accessibility: the same settings as before, on their own screen (like Download my journal).
+function AccessibilityScreen({ onBack }) {
   const { settings, effective, update } = useContext(A11yContext);
+  const matching = settings.match;
+  const deviceTag = matching ? 'Device' : null;
+  const panel = { background: '#0a0f2e', border: '1px solid #131a43' };
+
+  // Turning "match device" off keeps whatever is in effect right now as the starting
+  // point, so nothing visibly changes until the person picks something.
+  const setMatch = (on) =>
+    on ? update({ match: true }) : update({ match: false, contrast: effective.contrast, motion: effective.motion });
+
+  return (
+    <div className="px-5 pt-4 pb-10">
+      <div className="flex items-center gap-3 mb-4">
+        <button onClick={onBack} className="p-2.5 -ml-1 rounded-full btn-raised-sm" style={{ color: '#c9a227', background: '#131b46' }} aria-label="Back to Account">
+          <ChevronLeft size={22} />
+        </button>
+        <h2 className="font-serif font-semibold" style={{ fontSize: 19, color: '#f3e9d8' }}>Accessibility</h2>
+      </div>
+
+        <div className="px-4 rounded-xl mb-2" style={panel}>
+          <A11yRow first title="Match device settings" desc="Text size, contrast and motion follow your phone. Turn off to set them yourself.">
+            <A11yToggle on={matching} onChange={setMatch} label="Match device settings" />
+          </A11yRow>
+        </div>
+
+        <div className="px-4 rounded-xl mb-2" style={panel}>
+          <A11yRow
+            first
+            title="Text size"
+            tag={deviceTag}
+            desc={matching ? "Uses your phone's own text size setting." : null}
+          >
+            {!matching && (
+              <div className="w-full flex rounded-lg p-1" style={{ background: '#080c26', border: '1px solid #131a43' }} role="radiogroup" aria-label="Text size">
+                {['Default', 'Large', 'Extra large'].map((label, i) => (
+                  <button
+                    key={label}
+                    type="button"
+                    role="radio"
+                    aria-checked={settings.text === i}
+                    onClick={() => update({ text: i })}
+                    className={`flex-1 py-2 rounded-md text-sm font-medium btn-raised-sm ${settings.text === i ? 'btn-pressed-sm' : ''}`}
+                    style={
+                      settings.text === i
+                        ? { background: 'linear-gradient(155deg, #f3e9d8, #e0d5b8)', color: '#0a0f2e' }
+                        : { background: '#0a0f2e', color: '#8d91a8' }
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </A11yRow>
+          <A11yRow title="High contrast" tag={deviceTag} desc="Lighter text, stronger borders and gold.">
+            <A11yToggle on={effective.contrast} disabled={matching} onChange={(v) => update({ contrast: v })} label="High contrast" />
+          </A11yRow>
+          <A11yRow title="Reduce motion" tag={deviceTag} desc="Turns off the splash spin, smoke and page flips.">
+            <A11yToggle on={effective.motion} disabled={matching} onChange={(v) => update({ motion: v })} label="Reduce motion" />
+          </A11yRow>
+        </div>
+
+        <div className="px-4 rounded-xl" style={panel}>
+          <A11yRow first title="Simplify background" desc="Flat navy instead of the photo and smoke texture.">
+            <A11yToggle on={settings.simple} onChange={(v) => update({ simple: v })} label="Simplify background" />
+          </A11yRow>
+          <A11yRow title="Larger tap targets" desc="Bigger buttons, stars, chips and nav bar.">
+            <A11yToggle on={settings.tap} onChange={(v) => update({ tap: v })} label="Larger tap targets" />
+          </A11yRow>
+          <A11yRow title="Show PIN while typing" desc="Shows digits instead of dots at sign-in and account deletion.">
+            <A11yToggle on={settings.pin} onChange={(v) => update({ pin: v })} label="Show PIN while typing" />
+          </A11yRow>
+        </div>
+    </div>
+  );
+}
+
+function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPhoto }) {
+  const { settings, effective } = useContext(A11yContext);
   const [confirming, setConfirming] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePin, setDeletePin] = useState('');
@@ -4066,7 +4145,6 @@ function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPho
   const [screen, setScreen] = useState('main');
 
   const matching = settings.match;
-  const deviceTag = matching ? 'Device' : null;
   const panel = { background: '#0a0f2e', border: '1px solid #131a43' };
   const initial = (userEmail || '?').trim().charAt(0).toUpperCase() || '?';
 
@@ -4091,10 +4169,25 @@ function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPho
     }
   };
 
-  // Turning "match device" off keeps whatever is in effect right now as the starting
-  // point, so nothing visibly changes until the person picks something.
-  const setMatch = (on) =>
-    on ? update({ match: true }) : update({ match: false, contrast: effective.contrast, motion: effective.motion });
+  const a11ySummary =
+    [
+      ...(matching
+        ? ['Matching your device']
+        : [
+            effective.contrast && 'High contrast',
+            effective.motion && 'Reduce motion',
+            settings.text > 0 && `Text ${['Default', 'Large', 'Extra large'][settings.text]}`,
+          ]),
+      settings.simple && 'Simple background',
+      settings.tap && 'Larger tap targets',
+      settings.pin && 'Show PIN',
+    ]
+      .filter(Boolean)
+      .join(', ') || 'Set by you';
+
+  if (screen === 'accessibility') {
+    return <AccessibilityScreen onBack={() => setScreen('main')} />;
+  }
 
   if (screen === 'download') {
     return <DownloadJournal onBack={() => setScreen('main')} onLoadAll={onLoadAll} onGetPhoto={onGetPhoto} />;
@@ -4165,61 +4258,17 @@ function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPho
         <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>
           Accessibility
         </div>
-
-        <div className="px-4 rounded-xl mb-2" style={panel}>
-          <A11yRow first title="Match device settings" desc="Text size, contrast and motion follow your phone. Turn off to set them yourself.">
-            <A11yToggle on={matching} onChange={setMatch} label="Match device settings" />
-          </A11yRow>
-        </div>
-
-        <div className="px-4 rounded-xl mb-2" style={panel}>
-          <A11yRow
-            first
-            title="Text size"
-            tag={deviceTag}
-            desc={matching ? "Uses your phone's own text size setting." : null}
-          >
-            {!matching && (
-              <div className="w-full flex rounded-lg p-1" style={{ background: '#080c26', border: '1px solid #131a43' }} role="radiogroup" aria-label="Text size">
-                {['Default', 'Large', 'Extra large'].map((label, i) => (
-                  <button
-                    key={label}
-                    type="button"
-                    role="radio"
-                    aria-checked={settings.text === i}
-                    onClick={() => update({ text: i })}
-                    className={`flex-1 py-2 rounded-md text-sm font-medium btn-raised-sm ${settings.text === i ? 'btn-pressed-sm' : ''}`}
-                    style={
-                      settings.text === i
-                        ? { background: 'linear-gradient(155deg, #f3e9d8, #e0d5b8)', color: '#0a0f2e' }
-                        : { background: '#0a0f2e', color: '#8d91a8' }
-                    }
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </A11yRow>
-          <A11yRow title="High contrast" tag={deviceTag} desc="Lighter text, stronger borders and gold.">
-            <A11yToggle on={effective.contrast} disabled={matching} onChange={(v) => update({ contrast: v })} label="High contrast" />
-          </A11yRow>
-          <A11yRow title="Reduce motion" tag={deviceTag} desc="Turns off the splash spin, smoke and page flips.">
-            <A11yToggle on={effective.motion} disabled={matching} onChange={(v) => update({ motion: v })} label="Reduce motion" />
-          </A11yRow>
-        </div>
-
-        <div className="px-4 rounded-xl" style={panel}>
-          <A11yRow first title="Simplify background" desc="Flat navy instead of the photo and smoke texture.">
-            <A11yToggle on={settings.simple} onChange={(v) => update({ simple: v })} label="Simplify background" />
-          </A11yRow>
-          <A11yRow title="Larger tap targets" desc="Bigger buttons, stars, chips and nav bar.">
-            <A11yToggle on={settings.tap} onChange={(v) => update({ tap: v })} label="Larger tap targets" />
-          </A11yRow>
-          <A11yRow title="Show PIN while typing" desc="Shows digits instead of dots at sign-in and account deletion.">
-            <A11yToggle on={settings.pin} onChange={(v) => update({ pin: v })} label="Show PIN while typing" />
-          </A11yRow>
-        </div>
+        <button
+          onClick={() => setScreen('accessibility')}
+          className="w-full flex items-center gap-3 p-4 rounded-xl text-left"
+          style={panel}
+        >
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-semibold" style={{ color: '#f3e9d8' }}>Accessibility</span>
+            <span className="block text-xs mt-0.5" style={{ color: '#8d91a8' }}>{a11ySummary}</span>
+          </span>
+          <ChevronRight size={18} style={{ color: '#696c80' }} aria-hidden="true" />
+        </button>
       </div>
 
       <div>
