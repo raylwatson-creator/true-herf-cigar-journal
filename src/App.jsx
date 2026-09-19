@@ -259,6 +259,209 @@ async function saveBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
+// ---- Account > Month at a glance / Palate at a glance: data + saved pictures ----
+const MONTH_GRID = 12;         // photos shown in the Month at a glance window
+const MONTH_IMAGE_TILES = 16;  // photos drawn on the saved picture (4 x 4)
+
+const monthKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const monthLabelNow = () => new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+const monthNameNow = () => new Date().toLocaleDateString('en-US', { month: 'long' });
+const shortCategory = (label) => String(label).replace(' Flavors', '');
+
+// This calendar month's entries (dates are stored as local YYYY-MM-DD), newest first.
+function currentMonthEntries(entries) {
+  const ym = monthKey();
+  return entries
+    .filter((e) => String(e.date).startsWith(ym))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
+// Flavor tags from all three thirds of the given entries, counted per wheel category.
+function buildMonthPalate(list) {
+  const cats = FLAVOR_CATEGORIES.map((c) => ({ key: c.key, label: c.label, color: c.color, flavors: c.flavors, v: 0 }));
+  list.forEach((e) => {
+    ['first', 'second', 'final'].forEach((k) => {
+      (e.thirdsFlavors?.[k] || []).forEach((f) => {
+        const c = cats.find((x) => x.flavors.includes(f));
+        if (c) c.v += 1;
+      });
+    });
+  });
+  const used = cats.filter((c) => c.v > 0).sort((a, b) => b.v - a.v);
+  const total = used.reduce((s, c) => s + c.v, 0);
+  return { cats: used, total, top: used.slice(0, 3) };
+}
+
+// Canvas text with letter spacing done by hand (ctx.letterSpacing is not in every browser).
+function drawSpaced(ctx, text, cx, y, spacing) {
+  const chars = [...text];
+  const widths = chars.map((ch) => ctx.measureText(ch).width);
+  const total = widths.reduce((a, b) => a + b, 0) + spacing * (chars.length - 1);
+  let x = cx - total / 2;
+  const prev = ctx.textAlign;
+  ctx.textAlign = 'left';
+  chars.forEach((ch, i) => {
+    ctx.fillText(ch, x, y);
+    x += widths[i] + spacing;
+  });
+  ctx.textAlign = prev;
+}
+
+function drawCover(ctx, img, x, y, w, h) {
+  const s = Math.max(w / img.width, h / img.height);
+  const sw = w / s;
+  const sh = h / s;
+  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, w, h);
+}
+
+// The navy card, gold hairline border, brand line and footer shared by both saved pictures.
+async function startShareCanvas() {
+  if (document.fonts && document.fonts.ready) {
+    try { await document.fonts.ready; } catch {}
+  }
+  const W = 1080;
+  const H = 1920;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#141c50');
+  g.addColorStop(0.5, '#0a0f2e');
+  g.addColorStop(1, '#06091a');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#6b5716';
+  ctx.lineWidth = 3;
+  roundRectPath(ctx, 34, 34, W - 68, H - 68, 14);
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#c9a227';
+  ctx.font = '700 30px "Source Sans 3", sans-serif';
+  drawSpaced(ctx, 'TRUE HERF CIGAR JOURNAL', W / 2, 128, 9);
+  return { canvas, ctx, W, H };
+}
+
+function finishShareCanvas(ctx, canvas, W, H) {
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#8d91a8';
+  ctx.font = '400 28px "Source Sans 3", sans-serif';
+  drawSpaced(ctx, 'trueherfjournal.com', W / 2, H - 90, 5);
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('image failed'))), 'image/png'));
+}
+
+// Month at a glance picture: the count and the first 16 photos (4 x 4), then "+N more".
+async function generateMonthImage({ label, total, photos }) {
+  const { canvas, ctx, W, H } = await startShareCanvas();
+  ctx.fillStyle = '#f3e9d8';
+  ctx.font = '700 88px Fraunces, Georgia, serif';
+  ctx.fillText(label, W / 2, 250);
+  ctx.fillStyle = '#c9a227';
+  ctx.font = '600 200px "JetBrains Mono", monospace';
+  ctx.fillText(String(total), W / 2, 495);
+  ctx.fillStyle = '#8d91a8';
+  ctx.font = '400 40px "Source Sans 3", sans-serif';
+  ctx.fillText(total === 1 ? 'cigar this month' : 'cigars this month', W / 2, 565);
+
+  const imgs = await Promise.all(photos.map((p) => (p ? loadImage(p).catch(() => null) : null)));
+  const cols = 4;
+  const gap = 20;
+  const margin = 80;
+  const tile = (W - margin * 2 - gap * (cols - 1)) / cols;
+  const top = 645;
+  imgs.forEach((img, i) => {
+    const x = margin + (i % cols) * (tile + gap);
+    const y = top + Math.floor(i / cols) * (tile + gap);
+    ctx.save();
+    roundRectPath(ctx, x, y, tile, tile, 22);
+    ctx.clip();
+    if (img) {
+      drawCover(ctx, img, x, y, tile, tile);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#0d1338';
+      ctx.fillRect(x, y, tile, tile);
+      ctx.restore();
+      ctx.save();
+      ctx.setLineDash([12, 10]);
+      ctx.strokeStyle = '#283268';
+      ctx.lineWidth = 3;
+      roundRectPath(ctx, x + 1.5, y + 1.5, tile - 3, tile - 3, 22);
+      ctx.stroke();
+      ctx.restore();
+      // small camera glyph
+      const cx = x + tile / 2;
+      const cy = y + tile / 2;
+      ctx.strokeStyle = '#696c80';
+      ctx.lineWidth = 4;
+      roundRectPath(ctx, cx - 32, cy - 20, 64, 44, 8);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy + 2, 12, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  });
+  const shown = imgs.length;
+  if (total > shown) {
+    const rows = Math.ceil(shown / cols);
+    ctx.fillStyle = '#c9a227';
+    ctx.font = '700 58px Fraunces, Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`+${total - shown} more`, W / 2, top + rows * (tile + gap) + 50);
+  }
+  return finishShareCanvas(ctx, canvas, W, H);
+}
+
+// Palate at a glance picture: the month's wheel and top three notes.
+async function generatePalateImage({ label, cats, total }) {
+  const { canvas, ctx, W, H } = await startShareCanvas();
+  ctx.fillStyle = '#f3e9d8';
+  ctx.font = '700 96px Fraunces, Georgia, serif';
+  ctx.fillText('My palate', W / 2, 272);
+  ctx.fillStyle = '#8d91a8';
+  ctx.font = '400 40px "Source Sans 3", sans-serif';
+  ctx.fillText(label, W / 2, 338);
+
+  const cx = W / 2;
+  const cy = 860;
+  const r = 250;
+  ctx.lineWidth = 150;
+  ctx.lineCap = 'butt';
+  let a = -Math.PI / 2;
+  const gapA = cats.length > 1 ? 0.014 : 0;
+  cats.forEach((c) => {
+    const sweep = (c.v / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, a + gapA, a + sweep - gapA);
+    ctx.strokeStyle = c.color;
+    ctx.stroke();
+    a += sweep;
+  });
+  ctx.fillStyle = '#f3e9d8';
+  ctx.font = '700 130px Fraunces, Georgia, serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(String(total), cx, cy + 20);
+  ctx.fillStyle = '#8d91a8';
+  ctx.font = '400 36px "Source Sans 3", sans-serif';
+  ctx.fillText('flavor tags', cx, cy + 76);
+
+  cats.slice(0, 3).forEach((c, i) => {
+    const y = 1270 + i * 96;
+    ctx.fillStyle = c.color;
+    ctx.beginPath();
+    ctx.arc(200, y - 14, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#f3e9d8';
+    ctx.font = '600 50px "Source Sans 3", sans-serif';
+    ctx.fillText(shortCategory(c.label), 244, y);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#8d91a8';
+    ctx.fillText(`${Math.round((c.v / total) * 100)}%`, W - 200, y);
+  });
+  return finishShareCanvas(ctx, canvas, W, H);
+}
+
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
 // Loaded lazily (only once someone actually opens checkout) and cached, so
@@ -1187,6 +1390,20 @@ function GlobalStyles() {
     }
     .th-nav-btn.th-active .th-nav-avatar { border-color: rgba(255,255,255,0.6); }
 
+    /* ---- floating Back button (Month at a glance, Palate at a glance, Accessibility) ----
+       Bottom right, just above the nav bar so a thumb reaches it. z-index 45: above the nav (40),
+       below every popup (50). */
+    .th-floatback {
+      position: fixed; right: 16px; bottom: calc(88px + env(safe-area-inset-bottom)); z-index: 45;
+      display: flex; align-items: center; gap: 4px; padding: 12px 20px 12px 12px;
+      border-radius: 9999px; border: 1.5px solid #d99a63;
+      background: linear-gradient(155deg, #b5652f, #8a4f24); color: #f6ecd9;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 3px 0 #5e3416, 0 8px 18px rgba(0,0,0,0.5);
+    }
+    .th-floatback:active { transform: translateY(2px); box-shadow: 0 1px 0 #5e3416, 0 4px 10px rgba(0,0,0,0.5); }
+    [data-th-big="1"] .th-floatback { padding: 16px 24px 16px 16px; font-size: 17px; bottom: calc(96px + env(safe-area-inset-bottom)); }
+
     /* ---- accessibility settings (set on <html> by useA11ySettings) ---- */
     /* Text size: scales the page content and popups (the nav bar stays a fixed size). */
     [data-th-text="1"] .th-zoomable { zoom: 1.15; }
@@ -1276,6 +1493,13 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
   const [wish, setWish] = useState(null);
   const [wishError, setWishError] = useState('');
   const [wishDraft, setWishDraft] = useState(null);
+  // Account tab sub-screens live here (not in AccountView) so opening a cigar from Month at a
+  // glance and pressing Back returns to the same window. 'main' | 'month' | 'monthAll' | 'palate' | 'accessibility' | 'download'
+  const [acctScreen, setAcctScreen] = useState('main');
+  // Wish list photos arrive separately from the list text: id -> data URL (false = fetch failed).
+  const [wishPhotos, setWishPhotos] = useState({});
+  const wishPhotosRef = useRef({});
+  const wishInflight = useRef({});
 
   const authFetch = async (url, options = {}) => {
     const res = await fetch(url, {
@@ -1393,8 +1617,9 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
 
   // ---- all entries, for the Stats tab only ----
   useEffect(() => {
-    // Stats needs every entry; the New Entry form also uses them (text only) to suggest cigars you have smoked before.
-    if ((view !== 'stats' && view !== 'add') || allEntries !== null) return undefined;
+    // Stats needs every entry; the New Entry form uses them (text only) to suggest cigars you have smoked before;
+    // the Account tab uses them for Month at a glance and Palate at a glance.
+    if ((view !== 'stats' && view !== 'add' && view !== 'account') || allEntries !== null) return undefined;
     let cancelled = false;
     (async () => {
       try {
@@ -1427,6 +1652,46 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
     return () => { dead = true; };
   }, []);
 
+  const putWishPhoto = (id, photo) => {
+    wishPhotosRef.current = { ...wishPhotosRef.current, [id]: photo };
+    setWishPhotos(wishPhotosRef.current);
+  };
+
+  const fetchWishPhoto = (id) => {
+    const cached = wishPhotosRef.current[id];
+    if (typeof cached === 'string') return Promise.resolve(cached);
+    if (wishInflight.current[id]) return wishInflight.current[id];
+    const p = (async () => {
+      try {
+        const res = await authFetch(`${WISHLIST_API}?photo=${encodeURIComponent(id)}`);
+        if (!res.ok) throw new Error('photo failed');
+        const data = await res.json();
+        putWishPhoto(id, data.photo || false);
+        return data.photo || null;
+      } catch (e) {
+        putWishPhoto(id, false);
+        return null;
+      } finally {
+        delete wishInflight.current[id];
+      }
+    })();
+    wishInflight.current[id] = p;
+    return p;
+  };
+
+  const loadWishPhotos = (list) => {
+    const ids = (list || []).filter((w) => w.hasPhoto && wishPhotosRef.current[w.id] === undefined).map((w) => w.id);
+    let i = 0;
+    const worker = async () => {
+      while (i < ids.length) {
+        const id = ids[i];
+        i += 1;
+        await fetchWishPhoto(id);
+      }
+    };
+    for (let k = 0; k < Math.min(3, ids.length); k += 1) worker();
+  };
+
   const addWish = async (item) => {
     const res = await authFetch(WISHLIST_API, {
       method: 'POST',
@@ -1435,6 +1700,8 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Could not add it. Please try again.');
+    // The photo just picked is already in hand, so the new row shows it without another fetch.
+    if (item.photo) putWishPhoto(data.id, item.photo);
     setWish((prev) => [data, ...(prev || [])]);
   };
 
@@ -1457,8 +1724,11 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
     }
   };
 
-  const openAddFromWish = (item) => {
-    setWishDraft({ id: item.id, brand: item.brand || '', name: item.name || '', vitola: item.vitola || '' });
+  const openAddFromWish = async (item) => {
+    // The wish list photo comes along into the entry form (cached, or fetched now).
+    let photo = null;
+    if (item.hasPhoto) photo = await fetchWishPhoto(item.id);
+    setWishDraft({ id: item.id, brand: item.brand || '', name: item.name || '', vitola: item.vitola || '', photo });
     go('add');
   };
 
@@ -1553,7 +1823,7 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
       const wasOnPage = pageData.entries.some((e) => e.id === id);
       if (wasOnPage && pageData.entries.length === 1 && page > 1) setPage(page - 1);
       setRefreshKey((k) => k + 1);
-      go(detailFrom === 'stats' ? 'stats' : 'list');
+      go(detailFrom === 'stats' || detailFrom === 'account' ? detailFrom : 'list');
     } catch (e) {
       setError('Could not delete — please try again.');
     }
@@ -1641,7 +1911,7 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
                     />
                   </div>
                   {journalTab === 'wish' ? (
-                    <WishListView items={wish} error={wishError} onAdd={addWish} onRemove={removeWish} onSmoked={openAddFromWish} />
+                    <WishListView items={wish} error={wishError} onAdd={addWish} onRemove={removeWish} onSmoked={openAddFromWish} photos={wishPhotos} onNeedPhotos={loadWishPhotos} />
                   ) : (
                     <ListView
                       entries={pageData.entries}
@@ -1679,7 +1949,19 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
               ) : view === 'guide' ? (
                 <GuideView />
               ) : view === 'account' ? (
-                <AccountView userEmail={userEmail} onLogout={onLogout} onDeleteAccount={deleteAccount} onLoadAll={loadAllForExport} onGetPhoto={fetchPhoto} />
+                <AccountView
+                  userEmail={userEmail}
+                  onLogout={onLogout}
+                  onDeleteAccount={deleteAccount}
+                  onLoadAll={loadAllForExport}
+                  onGetPhoto={fetchPhoto}
+                  screen={acctScreen}
+                  setScreen={setAcctScreen}
+                  entries={allEntries}
+                  resolvePhoto={resolvePhoto}
+                  loadPhotos={loadPhotosFor}
+                  onOpenEntry={(id) => openEntry(id, 'account', (allEntries || []).find((e) => e.id === id) || null)}
+                />
               ) : view === 'detail' && active ? (
                 <DetailView entry={active} onDelete={deleteEntry} onEdit={openEdit} />
               ) : null}
@@ -1688,7 +1970,7 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
         </div>
       </div>
 
-      <BottomNav tab={navTab} onSelect={(key) => { setOriginPop(null); go(key); }} visible={navVisible} userEmail={userEmail} />
+      <BottomNav tab={navTab} onSelect={(key) => { setOriginPop(null); if (key === 'account') setAcctScreen('main'); go(key); }} visible={navVisible} userEmail={userEmail} />
     </div>
   );
 }
@@ -2323,7 +2605,35 @@ function WishSheet({ onClose, children, title }) {
   );
 }
 
-function WishListView({ items, error, onAdd, onRemove, onSmoked }) {
+// Take Photo / Choose from Library, the same sheet New Entry uses. Sits above WishSheet (z 60).
+function PhotoSourceSheet({ onClose, onCamera, onLibrary }) {
+  return createPortal(
+    <div className="fixed inset-0 flex items-end justify-center" style={{ zIndex: 60, background: 'rgba(0,0,0,0.55)' }} onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-t-2xl p-4 flex flex-col gap-2"
+        style={{ background: '#0a0f2e', border: '1px solid #131a43', borderBottom: 'none', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-1 px-1">
+          <span className="text-sm font-semibold" style={{ color: '#c9a227' }}>Add Photo</span>
+          <button onClick={onClose} style={{ color: '#71758f' }} aria-label="Close"><X size={18} /></button>
+        </div>
+        <button onClick={onCamera} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl btn-raised-sm" style={{ background: '#131b46', border: '1px solid #131a43', color: '#f0e6d8' }}>
+          <Camera size={18} style={{ color: '#c9a227' }} />
+          <span className="text-sm">Take Photo</span>
+        </button>
+        <button onClick={onLibrary} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl btn-raised-sm" style={{ background: '#131b46', border: '1px solid #131a43', color: '#f0e6d8' }}>
+          <ImageIcon size={18} style={{ color: '#c9a227' }} />
+          <span className="text-sm">Choose from Library</span>
+        </button>
+        <button onClick={onClose} className="w-full text-center px-4 py-3 rounded-xl mt-1" style={{ color: '#71758f' }}>Cancel</button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function WishListView({ items, error, onAdd, onRemove, onSmoked, photos = {}, onNeedPhotos }) {
   const [sheet, setSheet] = useState(null); // null | { kind: 'add' } | { kind: 'smoked', item }
   const [brand, setBrand] = useState('');
   const [name, setName] = useState('');
@@ -2331,9 +2641,30 @@ function WishListView({ items, error, onAdd, onRemove, onSmoked }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [photo, setPhoto] = useState(null);
+  const [showSrc, setShowSrc] = useState(false);
+  const camRef = useRef(null);
+  const libRef = useRef(null);
+
+  // Rows show their photo as a thumbnail; the photos themselves are fetched a few at a time.
+  useEffect(() => {
+    if (items && onNeedPhotos) onNeedPhotos(items);
+  }, [items]);
+
+  const handlePhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setPhoto(await resizeImage(file));
+    } catch {
+      // ignore
+    } finally {
+      e.target.value = '';
+    }
+  };
 
   const openAdd = () => {
-    setBrand(''); setName(''); setVitola(''); setNote(''); setErr('');
+    setBrand(''); setName(''); setVitola(''); setNote(''); setErr(''); setPhoto(null); setShowSrc(false);
     setSheet({ kind: 'add' });
   };
   const submit = async () => {
@@ -2341,7 +2672,7 @@ function WishListView({ items, error, onAdd, onRemove, onSmoked }) {
     setBusy(true);
     setErr('');
     try {
-      await onAdd({ brand: brand.trim(), name: name.trim(), vitola: vitola.trim(), note: note.trim() });
+      await onAdd({ brand: brand.trim(), name: name.trim(), vitola: vitola.trim(), note: note.trim(), ...(photo ? { photo } : {}) });
       setSheet(null);
     } catch (e) {
       setErr(e.message || 'Could not add it. Please try again.');
@@ -2374,11 +2705,22 @@ function WishListView({ items, error, onAdd, onRemove, onSmoked }) {
           <div className="flex flex-col gap-3">
             {items.map((w) => (
               <div key={w.id} className="p-3 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
-                <div className="font-serif font-semibold" style={{ color: '#f3e9d8', fontSize: 16 }}>{w.brand}</div>
-                {(w.name || w.vitola) && (
-                  <div className="text-sm" style={{ color: '#8d91a8' }}>{[w.name, w.vitola].filter(Boolean).join(' · ')}</div>
-                )}
-                {w.note && <div className="text-xs mt-1" style={{ color: '#696c80' }}>{w.note}</div>}
+                <div className="flex gap-3">
+                  <EntryPhoto
+                    src={w.hasPhoto ? (photos[w.id] === false ? null : photos[w.id]) : null}
+                    hasPhoto={!!w.hasPhoto}
+                    className="shrink-0 rounded-lg"
+                    style={{ width: 64, height: 64 }}
+                    iconSize={20}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-serif font-semibold" style={{ color: '#f3e9d8', fontSize: 16 }}>{w.brand}</div>
+                    {(w.name || w.vitola) && (
+                      <div className="text-sm" style={{ color: '#8d91a8' }}>{[w.name, w.vitola].filter(Boolean).join(' · ')}</div>
+                    )}
+                    {w.note && <div className="text-xs mt-1" style={{ color: '#696c80' }}>{w.note}</div>}
+                  </div>
+                </div>
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => setSheet({ kind: 'smoked', item: w })}
@@ -2409,6 +2751,39 @@ function WishListView({ items, error, onAdd, onRemove, onSmoked }) {
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name or line" aria-label="Name or line" style={inputStyle} />
           <input value={vitola} onChange={(e) => setVitola(e.target.value)} placeholder="Size (optional)" aria-label="Size" style={inputStyle} />
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (who told you, where to buy)" aria-label="Note" maxLength={300} style={inputStyle} />
+          <div className="flex items-center gap-3 px-1">
+            <button
+              type="button"
+              onClick={() => setShowSrc(true)}
+              className="shrink-0 rounded-xl flex items-center justify-center overflow-hidden btn-raised-sm"
+              style={{ width: 84, height: 84, background: '#131b46', border: '1px dashed #283268' }}
+              aria-label={photo ? 'Change photo' : 'Add photo'}
+            >
+              {photo ? (
+                <img src={photo} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="flex flex-col items-center gap-1" style={{ color: '#c9a227' }}>
+                  <Camera size={20} />
+                  <span className="text-xs">Add photo</span>
+                </div>
+              )}
+            </button>
+            <div className="flex-1 text-xs" style={{ color: '#8d91a8' }}>
+              {photo ? 'This photo comes along into your entry when you tap Smoked it.' : 'Optional. A photo of the band or the shop display helps you find it later.'}
+            </div>
+            {photo && (
+              <button type="button" onClick={() => setPhoto(null)} className="text-xs px-2 py-1" style={{ color: '#f0b199' }}>Remove</button>
+            )}
+          </div>
+          <input ref={camRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
+          <input ref={libRef} type="file" accept="image/*" onChange={handlePhoto} className="hidden" />
+          {showSrc && (
+            <PhotoSourceSheet
+              onClose={() => setShowSrc(false)}
+              onCamera={() => { setShowSrc(false); camRef.current?.click(); }}
+              onLibrary={() => { setShowSrc(false); libRef.current?.click(); }}
+            />
+          )}
           {err && <div className="text-sm px-1" style={{ color: '#e8b89a' }}>{err}</div>}
           <div className="flex gap-2 mt-1">
             <button onClick={() => setSheet(null)} className="flex-1 py-3 rounded-lg font-medium btn-raised" style={{ background: '#131b46', border: '1px solid #283268', color: '#e8dbc3' }}>Cancel</button>
@@ -2427,13 +2802,24 @@ function WishListView({ items, error, onAdd, onRemove, onSmoked }) {
       {sheet && sheet.kind === 'smoked' && (
         <WishSheet title="Smoked it" onClose={() => setSheet(null)}>
           <p className="text-xs px-1" style={{ color: '#8d91a8' }}>
-            New Entry opens with these already filled in. The cigar leaves your wish list once you save the entry.
+            New Entry opens with these already filled in, photo included. The cigar leaves your wish list once you save the entry.
           </p>
-          <div className="p-3 rounded-lg" style={{ background: '#0d1334', border: '1px solid #c9a22766' }}>
-            <div className="font-serif font-semibold" style={{ color: '#f3e9d8', fontSize: 16 }}>{sheet.item.brand}</div>
-            {(sheet.item.name || sheet.item.vitola) && (
-              <div className="text-sm" style={{ color: '#8d91a8' }}>{[sheet.item.name, sheet.item.vitola].filter(Boolean).join(' · ')}</div>
+          <div className="p-3 rounded-lg flex gap-3" style={{ background: '#0d1334', border: '1px solid #c9a22766' }}>
+            {sheet.item.hasPhoto && (
+              <EntryPhoto
+                src={photos[sheet.item.id] === false ? null : photos[sheet.item.id]}
+                hasPhoto
+                className="shrink-0 rounded-lg"
+                style={{ width: 56, height: 56 }}
+                iconSize={18}
+              />
             )}
+            <div className="min-w-0">
+              <div className="font-serif font-semibold" style={{ color: '#f3e9d8', fontSize: 16 }}>{sheet.item.brand}</div>
+              {(sheet.item.name || sheet.item.vitola) && (
+                <div className="text-sm" style={{ color: '#8d91a8' }}>{[sheet.item.name, sheet.item.vitola].filter(Boolean).join(' · ')}</div>
+              )}
+            </div>
           </div>
           <div className="flex gap-2 mt-1">
             <button onClick={() => setSheet(null)} className="flex-1 py-3 rounded-lg font-medium btn-raised" style={{ background: '#131b46', border: '1px solid #283268', color: '#e8dbc3' }}>Not yet</button>
@@ -2615,7 +3001,7 @@ function AddView({ onSave, onCancel, initialEntry = null, history = null, prefil
   const [finalFlavors, setFinalFlavors] = useState(initialEntry?.thirdsFlavors?.final || []);
   const [finalThoughts, setFinalThoughts] = useState(initialEntry?.finalThoughts || '');
   const [activeThird, setActiveThird] = useState('first');
-  const [photo, setPhoto] = useState(initialEntry?.photo || null);
+  const [photo, setPhoto] = useState(initialEntry?.photo || prefill?.photo || null);
   const [saving, setSaving] = useState(false);
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const cameraRef = useRef(null);
@@ -2632,6 +3018,7 @@ function AddView({ onSave, onCancel, initialEntry = null, history = null, prefil
   // price, pairing and notes always start blank).
   const [picked, setPicked] = useState(isEdit || !!prefill);
   const [fromJournal, setFromJournal] = useState(false);
+  const [fromWish, setFromWish] = useState(!!prefill);
   const suggestions = useMemo(() => {
     const q = foldText(brand).trim();
     if (picked || q.length < 2 || !history) return [];
@@ -2776,7 +3163,7 @@ function AddView({ onSave, onCancel, initialEntry = null, history = null, prefil
       <Field label="Brand *">
         <input
           value={brand}
-          onChange={(e) => { setBrand(e.target.value); setPicked(false); setFromJournal(false); }}
+          onChange={(e) => { setBrand(e.target.value); setPicked(false); setFromJournal(false); setFromWish(false); }}
           placeholder="e.g. Padrón"
           style={inputStyle}
           autoComplete="off"
@@ -2801,6 +3188,9 @@ function AddView({ onSave, onCancel, initialEntry = null, history = null, prefil
         )}
         {fromJournal && (
           <p className="text-xs mt-1.5" style={{ color: '#c9a227' }}>Filled in from your journal. Change anything that is different today.</p>
+        )}
+        {fromWish && !fromJournal && (
+          <p className="text-xs mt-1.5" style={{ color: '#c9a227' }}>Filled in from your wish list{photo ? ', photo included' : ''}. Change anything that is different today.</p>
         )}
       </Field>
       <Field label="Name / Line">
@@ -4069,7 +4459,7 @@ function AccessibilityScreen({ onBack }) {
     on ? update({ match: true }) : update({ match: false, contrast: effective.contrast, motion: effective.motion });
 
   return (
-    <div className="px-5 pt-4 pb-10">
+    <div className="px-5 pt-4 pb-28">
       <div className="flex items-center gap-3 mb-4">
         <button onClick={onBack} className="p-2.5 -ml-1 rounded-full btn-raised-sm" style={{ color: '#c9a227', background: '#131b46' }} aria-label="Back to Account">
           <ChevronLeft size={22} />
@@ -4131,18 +4521,269 @@ function AccessibilityScreen({ onBack }) {
             <A11yToggle on={settings.pin} onChange={(v) => update({ pin: v })} label="Show PIN while typing" />
           </A11yRow>
         </div>
+      <FloatBack onClick={onBack} />
     </div>
   );
 }
 
-function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPhoto }) {
+// Floating Back button, bottom right above the nav bar. Rendered through a portal to
+// document.body for the same reason as the popups: a transform on the animated page wrapper
+// would otherwise change what "fixed" is measured against.
+function FloatBack({ onClick, label = 'Back' }) {
+  return createPortal(
+    <button type="button" onClick={onClick} className="th-floatback" aria-label={label}>
+      <ChevronLeft size={20} strokeWidth={2.6} />
+      {label}
+    </button>,
+    document.body
+  );
+}
+
+function ScreenHeader({ title, sub, onBack }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <button onClick={onBack} className="p-2.5 -ml-1 rounded-full btn-raised-sm" style={{ color: '#c9a227', background: '#131b46' }} aria-label="Back">
+        <ChevronLeft size={22} />
+      </button>
+      <div>
+        <h2 className="font-serif font-semibold" style={{ fontSize: 19, color: '#f3e9d8' }}>{title}</h2>
+        {sub && <div className="text-xs" style={{ color: '#c9a227' }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+// Account > Your journal > Month at a glance. `all` = the full list of the month's cigars.
+function MonthGlance({ entries, all, resolvePhoto, loadPhotos, onGetPhoto, onOpen, onShowAll, onBack }) {
+  const list = useMemo(() => (entries ? currentMonthEntries(entries) : null), [entries]);
+  const [shown, setShown] = useState(30);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const label = monthLabelNow();
+  const monthName = monthNameNow();
+  const panel = { background: '#0a0f2e', border: '1px solid #131a43' };
+
+  // The summary needs 12 photos on screen and 16 for the saved picture, so all 16 are fetched up front
+  // (the picture then builds instantly, which also keeps the iPhone share sheet tied to the tap).
+  useEffect(() => {
+    if (list) loadPhotos(all ? list.slice(0, shown) : list.slice(0, MONTH_IMAGE_TILES));
+  }, [list, all, shown]);
+
+  const save = async () => {
+    if (!list || busy || list.length === 0) return;
+    setBusy(true);
+    setNote('');
+    try {
+      const top = list.slice(0, MONTH_IMAGE_TILES);
+      const photos = [];
+      for (let i = 0; i < top.length; i += 4) {
+        // eslint-disable-next-line no-await-in-loop
+        const batch = await Promise.all(top.slice(i, i + 4).map((e) => (e.hasPhoto ? onGetPhoto(e.id) : null)));
+        photos.push(...batch);
+      }
+      const blob = await generateMonthImage({ label, total: list.length, photos });
+      await saveBlob(blob, `trueherf-month-${monthKey()}.png`);
+    } catch (e) {
+      setNote('Could not save the picture. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="px-5 pt-4 pb-28">
+      <ScreenHeader
+        title={all ? monthName : 'Month at a glance'}
+        sub={all ? `${list ? list.length : 0} ${list && list.length === 1 ? 'cigar' : 'cigars'}, newest first` : label}
+        onBack={onBack}
+      />
+      {list === null ? (
+        <div className="rounded-xl th-shimmer" style={{ height: 300 }} aria-hidden="true" />
+      ) : list.length === 0 ? (
+        <EmptyState text={`No cigars logged in ${monthName} yet.`} />
+      ) : all ? (
+        <>
+          <div className="flex flex-col">
+            {list.slice(0, shown).map((e) => (
+              <button
+                key={e.id}
+                onClick={() => onOpen(e.id)}
+                className="flex items-center gap-3 py-2.5 text-left"
+                style={{ borderBottom: '1px solid #131a43' }}
+              >
+                <EntryPhoto src={resolvePhoto(e)} hasPhoto={e.hasPhoto} className="shrink-0 rounded-lg" style={{ width: 48, height: 48 }} iconSize={16} />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-serif font-semibold truncate" style={{ color: '#f3e9d8', fontSize: 15 }}>
+                    {[e.brand, e.name].filter(Boolean).join(' ')}
+                  </span>
+                  <span className="block text-xs" style={{ color: '#8d91a8' }}>{fmtDate(e.date)}</span>
+                </span>
+                <span className="font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace", color: '#c9a227', fontSize: 14 }}>
+                  {Number(e.rating).toFixed(1)}
+                </span>
+              </button>
+            ))}
+          </div>
+          {list.length > shown && (
+            <button
+              onClick={() => setShown((n) => n + 30)}
+              className="w-full mt-3 py-2.5 rounded-lg text-sm font-medium btn-raised-sm"
+              style={{ background: '#131b46', border: '1px solid #283268', color: '#e8dbc3' }}
+            >
+              Show more
+            </button>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="p-4 rounded-xl mb-4" style={panel}>
+            <div className="flex items-baseline gap-2">
+              <span className="font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 34, color: '#f3e9d8' }}>{list.length}</span>
+              <span className="text-sm" style={{ color: '#8d91a8' }}>{list.length === 1 ? 'cigar' : 'cigars'} this month</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2 mt-3">
+              {list.slice(0, MONTH_GRID).map((e) => (
+                <button
+                  key={e.id}
+                  onClick={() => onOpen(e.id)}
+                  className="rounded-lg overflow-hidden btn-raised-sm"
+                  style={{ aspectRatio: '1 / 1', border: '1px solid #131a43' }}
+                  aria-label={[e.brand, e.name].filter(Boolean).join(' ')}
+                >
+                  <EntryPhoto src={resolvePhoto(e)} hasPhoto={e.hasPhoto} className="w-full h-full" iconSize={18} />
+                </button>
+              ))}
+            </div>
+            {list.length > MONTH_GRID && (
+              <button
+                onClick={onShowAll}
+                className="w-full mt-3 py-2.5 rounded-lg font-serif font-semibold flex items-center justify-center gap-1"
+                style={{ color: '#c9a227', border: '1px solid #c9a22766', background: '#0d1334' }}
+              >
+                +{list.length - MONTH_GRID} more <ChevronRight size={16} />
+              </button>
+            )}
+            <div className="text-xs text-center mt-2.5" style={{ color: '#696c80' }}>Newest first. Tap a photo to open it.</div>
+          </div>
+          <button
+            onClick={save}
+            disabled={busy}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium btn-raised"
+            style={{ background: 'linear-gradient(155deg, #e2c25a, #b8901c)', color: '#0a0f2e', opacity: busy ? 0.6 : 1 }}
+          >
+            <Download size={16} /> {busy ? 'Preparing…' : 'Save as image'}
+          </button>
+          {note && <div className="mt-3 px-3 py-2 rounded text-sm" style={{ background: '#3a2416', color: '#e8b89a', border: '1px solid #5c3a1e' }}>{note}</div>}
+        </>
+      )}
+      <FloatBack onClick={onBack} />
+    </div>
+  );
+}
+
+// A donut of the month's flavor tags by wheel category (one ring segment per category).
+function PalateDonut({ cats, total, size = 168, r = 60, sw = 28 }) {
+  const c = size / 2;
+  const C = 2 * Math.PI * r;
+  let off = 0;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`Flavor tags this month: ${total}`}>
+      {cats.map((k) => {
+        const l = (k.v / total) * C;
+        const seg = (
+          <circle
+            key={k.key}
+            r={r}
+            cx={c}
+            cy={c}
+            fill="none"
+            stroke={k.color}
+            strokeWidth={sw}
+            strokeDasharray={`${Math.max(l - (cats.length > 1 ? 2 : 0), 0.1)} ${C}`}
+            strokeDashoffset={-off}
+            transform={`rotate(-90 ${c} ${c})`}
+          />
+        );
+        off += l;
+        return seg;
+      })}
+      <text x={c} y={c - 2} fill="#f3e9d8" textAnchor="middle" fontFamily="Fraunces, serif" fontWeight="700" fontSize="26">{total}</text>
+      <text x={c} y={c + 14} fill="#8d91a8" textAnchor="middle" fontSize="10">flavor tags</text>
+    </svg>
+  );
+}
+
+// Account > Your journal > Palate at a glance (this month only; the all-time wheel is in Stats).
+function PalateGlance({ entries, onBack }) {
+  const list = useMemo(() => (entries ? currentMonthEntries(entries) : null), [entries]);
+  const palate = useMemo(() => (list ? buildMonthPalate(list) : null), [list]);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const label = monthLabelNow();
+  const panel = { background: '#0a0f2e', border: '1px solid #131a43' };
+
+  const save = async () => {
+    if (!palate || busy || palate.total === 0) return;
+    setBusy(true);
+    setNote('');
+    try {
+      const blob = await generatePalateImage({ label, cats: palate.cats, total: palate.total });
+      await saveBlob(blob, `trueherf-palate-${monthKey()}.png`);
+    } catch (e) {
+      setNote('Could not save the picture. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="px-5 pt-4 pb-28">
+      <ScreenHeader title="Palate at a glance" sub={label} onBack={onBack} />
+      {palate === null ? (
+        <div className="rounded-xl th-shimmer" style={{ height: 300 }} aria-hidden="true" />
+      ) : palate.total === 0 ? (
+        <EmptyState text={`No flavor tags in ${monthNameNow()} yet. Tag flavors in the first, second or final third when you log a cigar.`} />
+      ) : (
+        <>
+          <div className="p-4 rounded-xl mb-4" style={panel}>
+            <div className="flex justify-center"><PalateDonut cats={palate.cats} total={palate.total} /></div>
+            <div className="mt-3">
+              {palate.top.map((c) => (
+                <div key={c.key} className="flex items-center gap-2.5 text-sm py-1.5">
+                  <span className="rounded-full shrink-0" style={{ width: 11, height: 11, background: c.color }} />
+                  <span style={{ color: '#f3e9d8' }}>{shortCategory(c.label)}</span>
+                  <span className="ml-auto" style={{ color: '#8d91a8' }}>{Math.round((100 * c.v) / palate.total)}%</span>
+                </div>
+              ))}
+            </div>
+            <div className="text-xs text-center mt-2" style={{ color: '#696c80' }}>Your all-time palate is on the Stats tab.</div>
+          </div>
+          <button
+            onClick={save}
+            disabled={busy}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium btn-raised"
+            style={{ background: 'linear-gradient(155deg, #e2c25a, #b8901c)', color: '#0a0f2e', opacity: busy ? 0.6 : 1 }}
+          >
+            <Download size={16} /> {busy ? 'Preparing…' : 'Save as image'}
+          </button>
+          {note && <div className="mt-3 px-3 py-2 rounded text-sm" style={{ background: '#3a2416', color: '#e8b89a', border: '1px solid #5c3a1e' }}>{note}</div>}
+        </>
+      )}
+      <FloatBack onClick={onBack} />
+    </div>
+  );
+}
+
+function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPhoto, screen, setScreen, entries, resolvePhoto, loadPhotos, onOpenEntry }) {
   const { settings, effective } = useContext(A11yContext);
   const [confirming, setConfirming] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePin, setDeletePin] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState('');
-  const [screen, setScreen] = useState('main');
+  // Row subtitles for Month / Palate at a glance (entries = null while they load).
+  const monthList = useMemo(() => (entries ? currentMonthEntries(entries) : null), [entries]);
+  const monthPalate = useMemo(() => (monthList ? buildMonthPalate(monthList) : null), [monthList]);
 
   const matching = settings.match;
   const panel = { background: '#0a0f2e', border: '1px solid #131a43' };
@@ -4187,6 +4828,25 @@ function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPho
 
   if (screen === 'accessibility') {
     return <AccessibilityScreen onBack={() => setScreen('main')} />;
+  }
+
+  if (screen === 'month' || screen === 'monthAll') {
+    return (
+      <MonthGlance
+        entries={entries}
+        all={screen === 'monthAll'}
+        resolvePhoto={resolvePhoto}
+        loadPhotos={loadPhotos}
+        onGetPhoto={onGetPhoto}
+        onOpen={onOpenEntry}
+        onShowAll={() => setScreen('monthAll')}
+        onBack={() => setScreen(screen === 'monthAll' ? 'month' : 'main')}
+      />
+    );
+  }
+
+  if (screen === 'palate') {
+    return <PalateGlance entries={entries} onBack={() => setScreen('main')} />;
   }
 
   if (screen === 'download') {
@@ -4241,6 +4901,36 @@ function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPho
         <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>
           Your journal
         </div>
+        <button
+          onClick={() => setScreen('month')}
+          className="w-full flex items-center gap-3 p-4 rounded-xl text-left mb-2.5"
+          style={panel}
+        >
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-semibold" style={{ color: '#f3e9d8' }}>Month at a glance</span>
+            <span className="block text-xs mt-0.5" style={{ color: '#8d91a8' }}>
+              {monthList === null ? 'Loading…' : `${monthNameNow()}, ${monthList.length} ${monthList.length === 1 ? 'cigar' : 'cigars'}`}
+            </span>
+          </span>
+          <ChevronRight size={18} style={{ color: '#696c80' }} aria-hidden="true" />
+        </button>
+        <button
+          onClick={() => setScreen('palate')}
+          className="w-full flex items-center gap-3 p-4 rounded-xl text-left mb-2.5"
+          style={panel}
+        >
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-semibold" style={{ color: '#f3e9d8' }}>Palate at a glance</span>
+            <span className="block text-xs mt-0.5" style={{ color: '#8d91a8' }}>
+              {monthPalate === null
+                ? 'Loading…'
+                : monthPalate.total > 0
+                  ? `${monthNameNow()}, top note ${shortCategory(monthPalate.top[0].label)}`
+                  : `${monthNameNow()}, no flavor tags yet`}
+            </span>
+          </span>
+          <ChevronRight size={18} style={{ color: '#696c80' }} aria-hidden="true" />
+        </button>
         <button
           onClick={() => setScreen('download')}
           className="w-full flex items-center gap-3 p-4 rounded-xl text-left"
