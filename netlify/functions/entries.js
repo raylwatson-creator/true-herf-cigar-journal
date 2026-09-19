@@ -30,6 +30,19 @@ function entryProblem(entry) {
       return `${key} must be a whole number from 0 to 4`;
     }
   }
+  // Construction is optional: absent/null, or { draw 0-4, burn 0-2, ash 0-2, relights 0-20 },
+  // each of them null or a whole number in range.
+  const c = entry.construction;
+  if (c !== undefined && c !== null) {
+    if (typeof c !== "object" || Array.isArray(c)) return "construction must be an object";
+    const limits = { draw: 4, burn: 2, ash: 2, relights: 20 };
+    for (const [key, max] of Object.entries(limits)) {
+      const v = c[key];
+      if (v !== undefined && v !== null && !(Number.isInteger(v) && v >= 0 && v <= max)) {
+        return `construction.${key} must be a whole number from 0 to ${max}`;
+      }
+    }
+  }
   return null;
 }
 

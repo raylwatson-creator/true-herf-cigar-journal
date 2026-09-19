@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
-import { Plus, Search, Camera, ChevronLeft, ChevronRight, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star, List, LayoutGrid, Share2, MoreVertical, Check, Smartphone } from 'lucide-react';
+import { Minus, Plus, Search, Camera, ChevronLeft, ChevronRight, BarChart2, BookOpen, Trash2, Download, Ruler, Image as ImageIcon, X, Pencil, Star, List, LayoutGrid, Share2, MoreVertical, Check, Smartphone } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 
 const ENTRIES_API = '/.netlify/functions/entries';
@@ -23,6 +23,242 @@ const PAGE_SIZE = 20;
 // Shared by the Strength / Body selectors, the detail page and the shared image:
 // five steps, lightest to strongest. Stored on an entry as a whole number 0 to 4 (or null).
 const STRENGTH_COLORS = ['#d9b45a', '#d39a3c', '#c7772f', '#b5522b', '#8f2f22'];
+const WISHLIST_API = '/.netlify/functions/wishlist';
+// Construction ratings (all optional). Stored on an entry as
+// construction: { draw: 0-4, burn: 0-2, ash: 0-2, relights: 0-20 }, each one null when not set.
+// The whole construction object is left off the entry when nothing was filled in.
+const DRAW_LABELS = ['Very tight', 'Slightly tight', 'Perfect', 'Slightly loose', 'Very loose'];
+const DRAW_COLORS = ['#c9863a', '#d9b45a', '#6fbf73', '#d9b45a', '#c9863a'];
+const BURN_LABELS = ['Even', 'Needed a touch-up', 'Canoed'];
+const ASH_LABELS = ['Firm and light', 'Flaky', 'Dark and loose'];
+const STRENGTH_NAMES = ['Mild', 'Mild-Medium', 'Medium', 'Medium-Bold', 'Bold'];
+const BODY_NAMES = ['Mild', 'Mild-Medium', 'Medium', 'Medium-Full', 'Full'];
+const MAX_RELIGHTS = 20;
+
+const hasConstruction = (c) =>
+  !!c && (c.draw != null || c.burn != null || c.ash != null || c.relights != null);
+const relightsText = (n) => (n === 0 ? 'None' : `${n} ${n === 1 ? 'relight' : 'relights'}`);
+
+// Accent-insensitive, case-insensitive text for matching what someone types against past entries.
+const foldText = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+// ---- Download my journal (CSV or PDF, built on the phone; nothing is uploaded) ----
+const todayStamp = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// A cell that starts with = + - @ would be run as a formula by Excel / Sheets, so it gets a leading apostrophe.
+const csvCell = (v) => {
+  let s = v == null ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return `"${s.replace(/"/g, '""')}"`;
+};
+
+function buildCsv(entries) {
+  const head = [
+    'Date', 'Brand', 'Name or line', 'Size', 'Wrapper', 'Binder', 'Filler', 'Strength', 'Body', 'Rating',
+    'Price', 'Pairing', 'First third notes', 'First third flavors', 'Second third notes', 'Second third flavors',
+    'Final third notes', 'Final third flavors', 'Thoughts on the final draw', 'Draw', 'Burn', 'Ash', 'Relights', 'Has photo',
+  ];
+  const rows = entries.map((e) => {
+    const c = e.construction || {};
+    const th = e.thirds || {};
+    const fl = e.thirdsFlavors || {};
+    return [
+      e.date, e.brand, e.name, e.vitola, e.wrapper, e.binder, e.filler,
+      e.strength != null ? STRENGTH_NAMES[e.strength] : '', e.body != null ? BODY_NAMES[e.body] : '',
+      typeof e.rating === 'number' ? e.rating.toFixed(1) : '', fmtPrice(e.price), e.pairing,
+      th.first, (fl.first || []).join(', '), th.second, (fl.second || []).join(', '), th.final, (fl.final || []).join(', '),
+      e.finalThoughts,
+      c.draw != null ? DRAW_LABELS[c.draw] : '', c.burn != null ? BURN_LABELS[c.burn] : '', c.ash != null ? ASH_LABELS[c.ash] : '',
+      c.relights != null ? c.relights : '', e.hasPhoto || e.photo ? 'Yes' : 'No',
+    ];
+  });
+  return '﻿' + [head, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
+}
+
+// jsPDF's built-in fonts only cover Western European characters; anything else becomes "?".
+const pdfText = (s) =>
+  String(s == null ? '' : s)
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[–—]/g, '-')
+    .replace(/…/g, '...')
+    .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '?');
+
+// One page per entry (a long entry runs onto a second page). jsPDF is loaded only when this runs,
+// so it is never part of the normal app download.
+async function buildJournalPdf(entries, { withPhotos, getPhoto, onProgress }) {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const M = 54;
+  const CW = W - M * 2;
+  const NAVY = [10, 15, 46];
+  const GOLD = [150, 116, 20];
+  const INK = [30, 30, 42];
+  const MUTED = [108, 108, 124];
+
+  for (let i = 0; i < entries.length; i += 1) {
+    const e = entries[i];
+    if (onProgress) onProgress(i, entries.length);
+    if (i > 0) doc.addPage();
+
+    const band = (cont) => {
+      doc.setFillColor(...NAVY);
+      doc.rect(0, 0, W, 40, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(226, 194, 90);
+      doc.text('TRUE HERF CIGAR JOURNAL', M, 25);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(200, 200, 215);
+      doc.text(`${i + 1} of ${entries.length}${cont ? ' (continued)' : ''}`, W - M, 25, { align: 'right' });
+    };
+    let y = 40;
+    band(false);
+    const ensure = (h) => {
+      if (y + h > H - M) {
+        doc.addPage();
+        band(true);
+        y = 40 + 24;
+      }
+    };
+    y += 44;
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(26);
+    doc.setTextColor(...INK);
+    const titleLines = doc.splitTextToSize(pdfText(e.brand || 'Untitled'), CW);
+    doc.text(titleLines, M, y);
+    y += titleLines.length * 28;
+    if (e.name) {
+      doc.setFont('times', 'italic');
+      doc.setFontSize(15);
+      doc.setTextColor(...MUTED);
+      const nl = doc.splitTextToSize(pdfText(e.name), CW);
+      doc.text(nl, M, y);
+      y += nl.length * 18;
+    }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...MUTED);
+    const dateTxt = e.date ? fmtDate(e.date) : '';
+    doc.text(pdfText(`${dateTxt}${dateTxt ? '     ' : ''}Rating ${typeof e.rating === 'number' ? e.rating.toFixed(1) : '-'} / 5`), M, y + 4);
+    y += 22;
+
+    if (withPhotos && e.hasPhoto) {
+      let photo = null;
+      try { photo = await getPhoto(e.id); } catch (err) { photo = null; }
+      if (photo) {
+        try {
+          const kind = /^data:image\/png/i.test(photo) ? 'PNG' : 'JPEG';
+          const props = doc.getImageProperties(photo);
+          const maxW = Math.min(CW, 260);
+          const maxH = 220;
+          const sc = Math.min(maxW / props.width, maxH / props.height);
+          const w = props.width * sc;
+          const h = props.height * sc;
+          ensure(h + 14);
+          doc.addImage(photo, kind, M, y, w, h);
+          y += h + 16;
+        } catch (err) {
+          // a photo that cannot be drawn is skipped; the rest of the entry still prints
+        }
+      }
+    }
+
+    const label = (t) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...GOLD);
+      doc.text(pdfText(t).toUpperCase(), M, y);
+      y += 13;
+    };
+    const para = (t) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.setTextColor(...INK);
+      const lines = doc.splitTextToSize(pdfText(t), CW);
+      lines.forEach((ln) => {
+        ensure(15);
+        doc.text(ln, M, y);
+        y += 15;
+      });
+    };
+
+    // details, two to a row
+    const c = e.construction || {};
+    const facts = [
+      ['Size', e.vitola], ['Wrapper', e.wrapper], ['Binder', e.binder], ['Filler', e.filler],
+      ['Price', fmtPrice(e.price)], ['Pairing', e.pairing],
+      ['Strength', e.strength != null ? STRENGTH_NAMES[e.strength] : ''], ['Body', e.body != null ? BODY_NAMES[e.body] : ''],
+      ['Draw', c.draw != null ? DRAW_LABELS[c.draw] : ''], ['Burn', c.burn != null ? BURN_LABELS[c.burn] : ''],
+      ['Ash', c.ash != null ? ASH_LABELS[c.ash] : ''], ['Relights', c.relights != null ? relightsText(c.relights) : ''],
+    ].filter((f) => f[1]);
+    for (let k = 0; k < facts.length; k += 2) {
+      ensure(34);
+      [facts[k], facts[k + 1]].forEach((f, col) => {
+        if (!f) return;
+        const x = M + col * (CW / 2);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...GOLD);
+        doc.text(pdfText(f[0]).toUpperCase(), x, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        doc.setTextColor(...INK);
+        doc.text(doc.splitTextToSize(pdfText(f[1]), CW / 2 - 12)[0], x, y + 14);
+      });
+      y += 34;
+    }
+    if (facts.length) y += 6;
+
+    [['first', 'First third'], ['second', 'Second third'], ['final', 'Final third']].forEach(([k, title]) => {
+      const txt = e.thirds && e.thirds[k];
+      const fl = (e.thirdsFlavors && e.thirdsFlavors[k]) || [];
+      if (!txt && !fl.length) return;
+      ensure(44);
+      label(title);
+      if (txt) para(txt);
+      if (fl.length) para(`Flavors: ${fl.join(', ')}`);
+      y += 8;
+    });
+    if (e.finalThoughts) {
+      ensure(44);
+      label('Thoughts on the final draw');
+      para(e.finalThoughts);
+    }
+  }
+  return doc.output('blob');
+}
+
+// Hands a finished file to the person. iPhone and iPad ignore <a download>, so there it goes through
+// the share sheet ("Save to Files"); everywhere else it downloads straight away.
+async function saveBlob(blob, filename) {
+  if (isIOSDevice() && navigator.share && navigator.canShare) {
+    try {
+      const file = new File([blob], filename, { type: blob.type });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      }
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
 // Loaded lazily (only once someone actually opens checkout) and cached, so
@@ -1034,6 +1270,12 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
   const [stashed, setStashed] = useState(null);
   const [error, setError] = useState('');
   const [showSplash, setShowSplash] = useState(true);
+  // Journal tab: the normal list, or the wish list. wishDraft = a wish-list cigar being logged
+  // ("Smoked it"): New Entry opens with it filled in and it leaves the list once the entry saves.
+  const [journalTab, setJournalTab] = useState('journal');
+  const [wish, setWish] = useState(null);
+  const [wishError, setWishError] = useState('');
+  const [wishDraft, setWishDraft] = useState(null);
 
   const authFetch = async (url, options = {}) => {
     const res = await fetch(url, {
@@ -1151,7 +1393,8 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
 
   // ---- all entries, for the Stats tab only ----
   useEffect(() => {
-    if (view !== 'stats' || allEntries !== null) return undefined;
+    // Stats needs every entry; the New Entry form also uses them (text only) to suggest cigars you have smoked before.
+    if ((view !== 'stats' && view !== 'add') || allEntries !== null) return undefined;
     let cancelled = false;
     (async () => {
       try {
@@ -1162,13 +1405,72 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
         const data = await res.json();
         if (!cancelled) setAllEntries(data);
       } catch (e) {
-        if (!cancelled) setError('Could not load your stats. Check your connection.');
+        if (!cancelled && view === 'stats') setError('Could not load your stats. Check your connection.');
       }
     })();
     return () => { cancelled = true; };
   }, [view, allEntries]);
 
+  // ---- wish list ----
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const res = await authFetch(WISHLIST_API);
+        if (!res.ok) throw new Error('load failed');
+        const data = await res.json();
+        if (!dead) { setWish(data); setWishError(''); }
+      } catch (e) {
+        if (!dead) { setWish([]); setWishError('Could not load your wish list. Check your connection.'); }
+      }
+    })();
+    return () => { dead = true; };
+  }, []);
+
+  const addWish = async (item) => {
+    const res = await authFetch(WISHLIST_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Could not add it. Please try again.');
+    setWish((prev) => [data, ...(prev || [])]);
+  };
+
+  const deleteWishOnServer = (id) =>
+    authFetch(WISHLIST_API, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+
+  const removeWish = async (id) => {
+    const before = wish;
+    setWish((w) => (w || []).filter((x) => x.id !== id));
+    try {
+      const res = await deleteWishOnServer(id);
+      if (!res.ok) throw new Error('delete failed');
+    } catch (e) {
+      setWish(before);
+      setError('Could not remove it. Please try again.');
+    }
+  };
+
+  const openAddFromWish = (item) => {
+    setWishDraft({ id: item.id, brand: item.brand || '', name: item.name || '', vitola: item.vitola || '' });
+    go('add');
+  };
+
+  // For Account > Download my journal: every entry as text, then photos one at a time on request.
+  const loadAllForExport = async () => {
+    const res = await authFetch(`${ENTRIES_API}?photos=0`);
+    if (!res.ok) throw new Error('load failed');
+    return res.json();
+  };
+
   const go = (next) => {
+    if (next !== 'add') setWishDraft(null);
     setError('');
     setView(next);
     window.scrollTo(0, 0);
@@ -1182,6 +1484,7 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
   };
 
   const addEntry = async (entry) => {
+    const wd = wishDraft;
     try {
       const res = await authFetch(ENTRIES_API, {
         method: 'POST',
@@ -1198,6 +1501,12 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
       setDebouncedQuery('');
       setPage(1);
       setRefreshKey((k) => k + 1);
+      if (wd) {
+        // Logged from the wish list: the cigar leaves it, and the new entry is what you see.
+        setWish((w) => (w || []).filter((x) => x.id !== wd.id));
+        deleteWishOnServer(wd.id).catch(() => {});
+        setJournalTab('journal');
+      }
       go('list');
     } catch (e) {
       setError('Could not save — please try again.');
@@ -1319,20 +1628,37 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
           <AnimatePresence mode="popLayout" initial={false}>
             <FlipPage key={view}>
               {view === 'list' ? (
-                <ListView
-                  entries={pageData.entries}
-                  query={query}
-                  setQuery={setQuery}
-                  onOpen={(id) => openEntry(id, 'list')}
-                  total={pageData.total}
-                  page={page}
-                  pages={pageData.pages}
-                  loading={listLoading}
-                  onPage={(p) => { setPage(p); window.scrollTo(0, 0); }}
-                  resolvePhoto={resolvePhoto}
-                />
+                <>
+                  <div className="px-5 pt-4">
+                    <StatSeg
+                      label="Journal or wish list"
+                      value={journalTab}
+                      onChange={setJournalTab}
+                      options={[
+                        { key: 'journal', label: 'Journal' },
+                        { key: 'wish', label: `Wish list${wish && wish.length ? ` (${wish.length})` : ''}` },
+                      ]}
+                    />
+                  </div>
+                  {journalTab === 'wish' ? (
+                    <WishListView items={wish} error={wishError} onAdd={addWish} onRemove={removeWish} onSmoked={openAddFromWish} />
+                  ) : (
+                    <ListView
+                      entries={pageData.entries}
+                      query={query}
+                      setQuery={setQuery}
+                      onOpen={(id) => openEntry(id, 'list')}
+                      total={pageData.total}
+                      page={page}
+                      pages={pageData.pages}
+                      loading={listLoading}
+                      onPage={(p) => { setPage(p); window.scrollTo(0, 0); }}
+                      resolvePhoto={resolvePhoto}
+                    />
+                  )}
+                </>
               ) : view === 'add' ? (
-                <AddView onSave={addEntry} onCancel={() => go('list')} />
+                <AddView onSave={addEntry} onCancel={() => go('list')} history={allEntries} prefill={wishDraft} />
               ) : view === 'edit' && active ? (
                 <AddView initialEntry={active} onSave={editEntry} onCancel={() => go('detail')} />
               ) : view === 'stats' ? (
@@ -1353,7 +1679,7 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
               ) : view === 'guide' ? (
                 <GuideView />
               ) : view === 'account' ? (
-                <AccountView userEmail={userEmail} onLogout={onLogout} onDeleteAccount={deleteAccount} />
+                <AccountView userEmail={userEmail} onLogout={onLogout} onDeleteAccount={deleteAccount} onLoadAll={loadAllForExport} onGetPhoto={fetchPhoto} />
               ) : view === 'detail' && active ? (
                 <DetailView entry={active} onDelete={deleteEntry} onEdit={openEdit} />
               ) : null}
@@ -1832,11 +2158,438 @@ function EmptyState({ text }) {
   );
 }
 
-function AddView({ onSave, onCancel, initialEntry = null }) {
+// ---- Construction (optional, on the entry form) ----
+function ChoiceChips({ label, options, value, onChange }) {
+  const { effective } = useContext(A11yContext);
+  return (
+    <div role="radiogroup" aria-label={label}>
+      <div className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: '#c9a227' }}>{label}</div>
+      <div className="flex gap-1.5">
+        {options.map((o, i) => {
+          const on = value === i;
+          return (
+            <button
+              key={o}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => onChange(on ? null : i)}
+              className="flex-1 rounded-lg text-xs font-semibold px-1 btn-raised-sm"
+              style={{
+                minHeight: effective.tap ? 52 : 40,
+                background: on ? 'linear-gradient(155deg, #f3e9d8, #e0d5b8)' : '#0a0f2e',
+                color: on ? '#0a0f2e' : '#8d91a8',
+                border: on ? '1px solid #e8dbc3' : '1px solid #283268',
+                lineHeight: 1.2,
+              }}
+            >
+              {o}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ConstructionEditor({ value, onChange }) {
+  const { effective } = useContext(A11yContext);
+  const [open, setOpen] = useState(hasConstruction(value));
+  const set = (k, v) => onChange({ ...value, [k]: v });
+  const rel = value.relights;
+  const stepBtn = {
+    width: effective.tap ? 48 : 40,
+    height: effective.tap ? 48 : 40,
+    background: '#131b46',
+    border: '1px solid #c9a22755',
+    color: '#c9a227',
+  };
+  return (
+    <div>
+      <div className="text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: '#c9a227' }}>
+        Construction <span style={{ color: '#696c80', textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>(optional)</span>
+      </div>
+      <div className="rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="w-full flex items-center justify-between gap-3 p-3 text-left"
+        >
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold" style={{ color: '#f3e9d8' }}>Draw, burn, ash and relights</span>
+            <span className="block text-xs mt-0.5" style={{ color: '#8d91a8' }}>
+              {hasConstruction(value) ? 'Filled in. Tap to edit.' : 'Tap to rate how it smoked.'}
+            </span>
+          </span>
+          <span className="shrink-0" style={{ color: '#c9a227' }} aria-hidden="true">
+            {open ? <Minus size={20} /> : <Plus size={20} />}
+          </span>
+        </button>
+        {open && (
+          <div className="flex flex-col gap-4 px-3 pb-4 pt-3" style={{ borderTop: '1px solid #131a43' }}>
+            <LevelSelect
+              label="Draw"
+              value={value.draw}
+              onChange={(v) => set('draw', v)}
+              labels={['Tight', '', 'Perfect', '', 'Loose']}
+              names={DRAW_LABELS}
+              colors={DRAW_COLORS}
+            />
+            <ChoiceChips label="Burn" options={BURN_LABELS} value={value.burn} onChange={(v) => set('burn', v)} />
+            <ChoiceChips label="Ash" options={ASH_LABELS} value={value.ash} onChange={(v) => set('ash', v)} />
+            <div role="group" aria-label="Relights">
+              <div className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: '#c9a227' }}>Relights</div>
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  aria-label="Fewer relights"
+                  onClick={() => set('relights', rel == null || rel <= 0 ? (rel == null ? null : 0) : rel - 1)}
+                  className="rounded-full flex items-center justify-center btn-raised-sm"
+                  style={stepBtn}
+                >
+                  <Minus size={18} />
+                </button>
+                <span className="font-serif font-semibold text-center" style={{ fontSize: 22, color: '#f3e9d8', minWidth: 28 }} aria-live="polite">
+                  {rel == null ? 0 : rel}
+                </span>
+                <button
+                  type="button"
+                  aria-label="More relights"
+                  onClick={() => set('relights', Math.min(MAX_RELIGHTS, (rel == null ? 0 : rel) + 1))}
+                  className="rounded-full flex items-center justify-center btn-raised-sm"
+                  style={stepBtn}
+                >
+                  <Plus size={18} />
+                </button>
+                {rel != null && (
+                  <button type="button" onClick={() => set('relights', null)} className="text-xs" style={{ color: '#8d91a8' }}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// The Construction card on the entry details page. Only drawn when something was filled in.
+function ConstructionCard({ value }) {
+  if (!hasConstruction(value)) return null;
+  const items = [
+    value.draw != null && ['Draw', DRAW_LABELS[value.draw]],
+    value.burn != null && ['Burn', BURN_LABELS[value.burn]],
+    value.ash != null && ['Ash', ASH_LABELS[value.ash]],
+    value.relights != null && ['Relights', relightsText(value.relights)],
+  ].filter(Boolean);
+  return (
+    <div className="mb-4 p-4 rounded-lg" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+      <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>Construction</div>
+      <div className="grid grid-cols-2 gap-3">
+        {items.map(([l, v]) => <InfoChip key={l} label={l} value={v} />)}
+      </div>
+    </div>
+  );
+}
+
+// ---- Wish list (second view on the Journal tab) ----
+function WishSheet({ onClose, children, title }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="w-full max-w-md rounded-t-2xl p-4 flex flex-col gap-3"
+        style={{ background: '#0a0f2e', border: '1px solid #131a43', borderBottom: 'none', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))', maxHeight: '90dvh', overflowY: 'auto' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-1">
+          <span className="font-serif font-semibold" style={{ color: '#f3e9d8', fontSize: 18 }}>{title}</span>
+          <button onClick={onClose} aria-label="Close" style={{ color: '#71758f' }}><X size={20} /></button>
+        </div>
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function WishListView({ items, error, onAdd, onRemove, onSmoked }) {
+  const [sheet, setSheet] = useState(null); // null | { kind: 'add' } | { kind: 'smoked', item }
+  const [brand, setBrand] = useState('');
+  const [name, setName] = useState('');
+  const [vitola, setVitola] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const openAdd = () => {
+    setBrand(''); setName(''); setVitola(''); setNote(''); setErr('');
+    setSheet({ kind: 'add' });
+  };
+  const submit = async () => {
+    if (!brand.trim() || busy) return;
+    setBusy(true);
+    setErr('');
+    try {
+      await onAdd({ brand: brand.trim(), name: name.trim(), vitola: vitola.trim(), note: note.trim() });
+      setSheet(null);
+    } catch (e) {
+      setErr(e.message || 'Could not add it. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="px-5 pt-4 relative">
+      <div className="relative" style={{ zIndex: 1 }}>
+        <button
+          onClick={openAdd}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium mb-4 btn-raised"
+          style={{ background: 'linear-gradient(155deg, #e2c25a, #b8901c)', color: '#0a0f2e', border: '1px solid #f0d77f' }}
+        >
+          <Plus size={18} /> Add to wish list
+        </button>
+        {error && (
+          <div className="mb-3 px-3 py-2 rounded text-sm" style={{ background: '#3a2416', color: '#e8b89a', border: '1px solid #5c3a1e' }}>{error}</div>
+        )}
+
+        {items === null ? (
+          <div className="flex flex-col gap-3" aria-hidden="true">
+            {[0, 1, 2].map((i) => <div key={i} className="h-24 rounded-xl th-shimmer" />)}
+          </div>
+        ) : items.length === 0 ? (
+          <EmptyState text="Nothing on your wish list yet. Add a cigar you want to try, then tap Smoked it after you light it." />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {items.map((w) => (
+              <div key={w.id} className="p-3 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
+                <div className="font-serif font-semibold" style={{ color: '#f3e9d8', fontSize: 16 }}>{w.brand}</div>
+                {(w.name || w.vitola) && (
+                  <div className="text-sm" style={{ color: '#8d91a8' }}>{[w.name, w.vitola].filter(Boolean).join(' · ')}</div>
+                )}
+                {w.note && <div className="text-xs mt-1" style={{ color: '#696c80' }}>{w.note}</div>}
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => setSheet({ kind: 'smoked', item: w })}
+                    className="flex-1 py-2.5 rounded-lg text-sm font-semibold btn-raised-sm"
+                    style={{ background: 'linear-gradient(155deg, #e2c25a, #b8901c)', color: '#0a0f2e', border: '1px solid #f0d77f' }}
+                  >
+                    Smoked it
+                  </button>
+                  <button
+                    onClick={() => onRemove(w.id)}
+                    aria-label={`Remove ${w.brand} from your wish list`}
+                    className="px-4 py-2.5 rounded-lg text-sm btn-raised-sm"
+                    style={{ color: '#f0b199', background: '#2b1712', border: '1px solid #5c2f22' }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {sheet && sheet.kind === 'add' && (
+        <WishSheet title="Add to wish list" onClose={() => setSheet(null)}>
+          <p className="text-xs px-1" style={{ color: '#8d91a8' }}>Only the brand is needed. The rest is optional.</p>
+          <input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Brand *" aria-label="Brand" style={inputStyle} autoFocus />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name or line" aria-label="Name or line" style={inputStyle} />
+          <input value={vitola} onChange={(e) => setVitola(e.target.value)} placeholder="Size (optional)" aria-label="Size" style={inputStyle} />
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (who told you, where to buy)" aria-label="Note" maxLength={300} style={inputStyle} />
+          {err && <div className="text-sm px-1" style={{ color: '#e8b89a' }}>{err}</div>}
+          <div className="flex gap-2 mt-1">
+            <button onClick={() => setSheet(null)} className="flex-1 py-3 rounded-lg font-medium btn-raised" style={{ background: '#131b46', border: '1px solid #283268', color: '#e8dbc3' }}>Cancel</button>
+            <button
+              onClick={submit}
+              disabled={!brand.trim() || busy}
+              className="flex-1 py-3 rounded-lg font-medium btn-raised"
+              style={{ background: brand.trim() ? 'linear-gradient(155deg, #b5652f, #8a4f24)' : '#131a43', color: '#f6ecd9', opacity: busy ? 0.7 : 1 }}
+            >
+              {busy ? 'Adding…' : 'Add'}
+            </button>
+          </div>
+        </WishSheet>
+      )}
+
+      {sheet && sheet.kind === 'smoked' && (
+        <WishSheet title="Smoked it" onClose={() => setSheet(null)}>
+          <p className="text-xs px-1" style={{ color: '#8d91a8' }}>
+            New Entry opens with these already filled in. The cigar leaves your wish list once you save the entry.
+          </p>
+          <div className="p-3 rounded-lg" style={{ background: '#0d1334', border: '1px solid #c9a22766' }}>
+            <div className="font-serif font-semibold" style={{ color: '#f3e9d8', fontSize: 16 }}>{sheet.item.brand}</div>
+            {(sheet.item.name || sheet.item.vitola) && (
+              <div className="text-sm" style={{ color: '#8d91a8' }}>{[sheet.item.name, sheet.item.vitola].filter(Boolean).join(' · ')}</div>
+            )}
+          </div>
+          <div className="flex gap-2 mt-1">
+            <button onClick={() => setSheet(null)} className="flex-1 py-3 rounded-lg font-medium btn-raised" style={{ background: '#131b46', border: '1px solid #283268', color: '#e8dbc3' }}>Not yet</button>
+            <button
+              onClick={() => { const it = sheet.item; setSheet(null); onSmoked(it); }}
+              className="flex-1 py-3 rounded-lg font-medium btn-raised"
+              style={{ background: 'linear-gradient(155deg, #b5652f, #8a4f24)', color: '#f6ecd9' }}
+            >
+              Open New Entry
+            </button>
+          </div>
+        </WishSheet>
+      )}
+    </div>
+  );
+}
+
+// ---- Account > Download my journal ----
+// A radio row or a checkbox row on the download screen.
+function DlOpt({ on, onClick, title, desc, box }) {
+  return (
+  <button
+    type="button"
+    role={box ? 'checkbox' : 'radio'}
+    aria-checked={on}
+    onClick={onClick}
+    className="w-full flex items-start gap-3 p-3 rounded-xl text-left mb-2"
+    style={{ background: on ? '#0d1334' : '#0a0f2e', border: on ? '1px solid #c9a227' : '1px solid #131a43' }}
+  >
+    <span
+      className="shrink-0 mt-0.5 flex items-center justify-center"
+      style={{ width: 18, height: 18, borderRadius: box ? 4 : 9, border: `2px solid ${on ? '#c9a227' : '#696c80'}`, background: on ? '#c9a227' : 'transparent' }}
+    >
+      {on && box && <Check size={12} style={{ color: '#0a0f2e' }} />}
+    </span>
+    <span>
+      <span className="block text-sm font-semibold" style={{ color: '#f3e9d8' }}>{title}</span>
+      <span className="block text-xs mt-0.5" style={{ color: '#8d91a8' }}>{desc}</span>
+    </span>
+  </button>
+  );
+}
+
+function DownloadJournal({ onBack, onLoadAll, onGetPhoto }) {
+  const [entries, setEntries] = useState(null);
+  const [fmt, setFmt] = useState('csv');
+  const [withPhotos, setWithPhotos] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [done, setDone] = useState('');
+  const [error, setError] = useState('');
+  const [ready, setReady] = useState(null); // { blob, filename } waiting for a fresh tap (iPhone share sheet)
+
+  useEffect(() => {
+    let dead = false;
+    onLoadAll()
+      .then((list) => { if (!dead) setEntries(list); })
+      .catch(() => { if (!dead) setError('Could not load your entries. Check your connection.'); });
+    return () => { dead = true; };
+  }, []);
+
+  const total = entries ? entries.length : 0;
+  const panel = { background: '#0a0f2e', border: '1px solid #131a43' };
+
+  const run = async () => {
+    if (busy || !entries || entries.length === 0) return;
+    setBusy(true); setError(''); setDone(''); setReady(null); setProgress('');
+    try {
+      const stamp = todayStamp();
+      let blob; let filename;
+      if (fmt === 'csv') {
+        blob = new Blob([buildCsv(entries)], { type: 'text/csv;charset=utf-8' });
+        filename = `trueherf-journal-${stamp}.csv`;
+      } else {
+        setProgress('Preparing your PDF…');
+        blob = await buildJournalPdf(entries, {
+          withPhotos,
+          getPhoto: onGetPhoto,
+          onProgress: (i, n) => setProgress(`Preparing your PDF… ${i + 1} of ${n}`),
+        });
+        filename = `trueherf-journal-${stamp}.pdf`;
+      }
+      if (isIOSDevice()) {
+        // The share sheet needs a fresh tap after a long build, so the file waits for one.
+        setReady({ blob, filename });
+      } else {
+        await saveBlob(blob, filename);
+        setDone(`Saved ${filename} (${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}).`);
+      }
+    } catch (e) {
+      setError('Could not build the file. Please try again.');
+    } finally {
+      setBusy(false);
+      setProgress('');
+    }
+  };
+
+  const shareReady = async () => {
+    if (!ready) return;
+    await saveBlob(ready.blob, ready.filename);
+    setDone(`Saved ${ready.filename}.`);
+    setReady(null);
+  };
+
+  return (
+    <div className="px-5 pt-4 pb-10">
+      <div className="flex items-center gap-3 mb-4">
+        <button onClick={onBack} className="p-2.5 -ml-1 rounded-full btn-raised-sm" style={{ color: '#c9a227', background: '#131b46' }} aria-label="Back to Account">
+          <ChevronLeft size={22} />
+        </button>
+        <h2 className="font-serif font-semibold" style={{ fontSize: 19, color: '#f3e9d8' }}>Download my journal</h2>
+      </div>
+
+      <p className="text-sm mb-3" style={{ color: '#8d91a8' }}>
+        {entries === null ? (error ? '' : 'Counting your entries…') : total === 0 ? 'Nothing to download yet. Log a cigar first.' : `All ${total} ${total === 1 ? 'entry' : 'entries'}, newest first.`}
+      </p>
+
+      <div role="radiogroup" aria-label="File type">
+        <DlOpt on={fmt === 'csv'} onClick={() => setFmt('csv')} title="Spreadsheet (CSV)" desc="Opens in Excel or Google Sheets. Every field in its own column, including construction." />
+        <DlOpt on={fmt === 'pdf'} onClick={() => setFmt('pdf')} title="Printable PDF" desc="One page per entry, like a printed journal." />
+      </div>
+      {fmt === 'pdf' && (
+        <DlOpt box on={withPhotos} onClick={() => setWithPhotos((v) => !v)} title="Include photos" desc="Makes the file larger and takes longer to prepare." />
+      )}
+
+      {ready ? (
+        <button onClick={shareReady} className="w-full py-3 rounded-lg font-medium mt-2 btn-raised" style={{ background: 'linear-gradient(155deg, #e2c25a, #b8901c)', color: '#0a0f2e' }}>
+          Save or share {ready.filename}
+        </button>
+      ) : (
+        <button
+          onClick={run}
+          disabled={busy || !entries || entries.length === 0}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium mt-2 btn-raised"
+          style={{ background: 'linear-gradient(155deg, #e2c25a, #b8901c)', color: '#0a0f2e', opacity: busy || !entries || entries.length === 0 ? 0.6 : 1 }}
+        >
+          <Download size={16} /> {busy ? (progress || 'Preparing…') : 'Download'}
+        </button>
+      )}
+
+      <div aria-live="polite">
+        {done && <div className="mt-3 px-3 py-2 rounded-lg text-sm" style={{ ...panel, color: '#e8dbc3', border: '1px solid #c9a22766' }}>{done}</div>}
+        {error && <div className="mt-3 px-3 py-2 rounded text-sm" style={{ background: '#3a2416', color: '#e8b89a', border: '1px solid #5c3a1e' }}>{error}</div>}
+      </div>
+      <p className="text-xs mt-3 text-center" style={{ color: '#696c80' }}>
+        The file is created on your phone. Nothing is sent anywhere.
+      </p>
+    </div>
+  );
+}
+
+function AddView({ onSave, onCancel, initialEntry = null, history = null, prefill = null }) {
   const isEdit = !!initialEntry;
-  const [brand, setBrand] = useState(initialEntry?.brand || '');
-  const [name, setName] = useState(initialEntry?.name || '');
-  const [vitola, setVitola] = useState(initialEntry?.vitola || '');
+  const [brand, setBrand] = useState(initialEntry?.brand || prefill?.brand || '');
+  const [name, setName] = useState(initialEntry?.name || prefill?.name || '');
+  const [vitola, setVitola] = useState(initialEntry?.vitola || prefill?.vitola || '');
   const [wrapper, setWrapper] = useState(initialEntry?.wrapper || '');
   const [binder, setBinder] = useState(initialEntry?.binder || '');
   const [filler, setFiller] = useState(initialEntry?.filler || '');
@@ -1867,6 +2620,44 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
+  const [construction, setConstruction] = useState({
+    draw: initialEntry?.construction?.draw ?? null,
+    burn: initialEntry?.construction?.burn ?? null,
+    ash: initialEntry?.construction?.ash ?? null,
+    relights: initialEntry?.construction?.relights ?? null,
+  });
+
+  // Faster logging: as a brand is typed, cigars already in the journal are offered; tapping one
+  // fills in the name, size, wrapper, binder, filler, strength and body (date, rating, photo,
+  // price, pairing and notes always start blank).
+  const [picked, setPicked] = useState(isEdit || !!prefill);
+  const [fromJournal, setFromJournal] = useState(false);
+  const suggestions = useMemo(() => {
+    const q = foldText(brand).trim();
+    if (picked || q.length < 2 || !history) return [];
+    const seen = new Set();
+    const out = [];
+    for (const h of history) {
+      const key = `${foldText(h.brand).trim()}|${foldText(h.name).trim()}`;
+      if (seen.has(key) || !foldText(`${h.brand || ''} ${h.name || ''}`).includes(q)) continue;
+      seen.add(key);
+      out.push(h);
+      if (out.length >= 4) break;
+    }
+    return out;
+  }, [brand, picked, history]);
+  const applyPast = (h) => {
+    setBrand(h.brand || '');
+    setName(h.name || '');
+    setVitola(h.vitola || '');
+    setWrapper(h.wrapper || '');
+    setBinder(h.binder || '');
+    setFiller(h.filler || '');
+    setStrength(h.strength ?? null);
+    setBody(h.body ?? null);
+    setPicked(true);
+    setFromJournal(true);
+  };
 
   const handlePhoto = async (e) => {
     const file = e.target.files?.[0];
@@ -1903,6 +2694,9 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
       thirdsFlavors: { first: firstFlavors, second: secondFlavors, final: finalFlavors },
       finalThoughts: finalThoughts.trim(),
       photo,
+      ...(hasConstruction(construction)
+        ? { construction: { draw: construction.draw ?? null, burn: construction.burn ?? null, ash: construction.ash ?? null, relights: construction.relights ?? null } }
+        : {}),
     });
     setSaving(false);
   };
@@ -1980,7 +2774,34 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
       )}
 
       <Field label="Brand *">
-        <input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. Padrón" style={inputStyle} />
+        <input
+          value={brand}
+          onChange={(e) => { setBrand(e.target.value); setPicked(false); setFromJournal(false); }}
+          placeholder="e.g. Padrón"
+          style={inputStyle}
+          autoComplete="off"
+        />
+        {suggestions.length > 0 && (
+          <div className="mt-1.5 rounded-lg overflow-hidden" style={{ background: '#0d1334', border: '1px solid #283268' }} role="group" aria-label="Cigars from your journal">
+            {suggestions.map((h, i) => (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => applyPast(h)}
+                className="w-full text-left px-3 py-2.5"
+                style={{ borderTop: i ? '1px solid #131a43' : 'none', color: '#f3e9d8' }}
+              >
+                <span className="block text-sm">{[h.brand, h.name].filter(Boolean).join(' ')}</span>
+                <span className="block text-xs mt-0.5" style={{ color: '#8d91a8' }}>
+                  {[h.vitola, h.wrapper, h.date ? `smoked ${fmtDate(h.date)}` : ''].filter(Boolean).join(' · ')}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {fromJournal && (
+          <p className="text-xs mt-1.5" style={{ color: '#c9a227' }}>Filled in from your journal. Change anything that is different today.</p>
+        )}
       </Field>
       <Field label="Name / Line">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. 1964 Anniversary" style={inputStyle} />
@@ -2093,6 +2914,8 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
         />
       </Field>
 
+      <ConstructionEditor value={construction} onChange={setConstruction} />
+
       <div className="flex gap-3 mt-2">
         <button onClick={onCancel} className="flex-1 py-3 rounded-lg font-medium btn-raised" style={{ background: '#131b46', border: '1px solid #283268', color: '#e8dbc3' }}>
           Cancel
@@ -2113,13 +2936,18 @@ function AddView({ onSave, onCancel, initialEntry = null }) {
 // Five selectable blocks (lightest to strongest) with labels under the first, middle and
 // last only. Used for Strength (Mild / Medium / Bold) and Body (Mild / Medium / Full).
 // Tapping the chosen block again clears it, so both stay optional.
-function LevelSelect({ label, value, onChange, labels }) {
+function LevelSelect({ label, value, onChange, labels, names = null, colors = STRENGTH_COLORS }) {
   const { effective } = useContext(A11yContext);
   return (
     <div role="radiogroup" aria-label={label}>
-      <div className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: '#c9a227' }}>{label}</div>
+      <div className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: '#c9a227' }}>
+        {label}
+        {names && value != null && (
+          <span style={{ color: '#e8dbc3', textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}> · {names[value]}</span>
+        )}
+      </div>
       <div className="flex gap-1.5">
-        {STRENGTH_COLORS.map((color, i) => {
+        {colors.map((color, i) => {
           const on = value === i;
           return (
             <button
@@ -2127,7 +2955,7 @@ function LevelSelect({ label, value, onChange, labels }) {
               type="button"
               role="radio"
               aria-checked={on}
-              aria-label={`${label} ${i + 1} of 5${labels[i] ? `, ${labels[i]}` : ''}`}
+              aria-label={`${label} ${i + 1} of 5${(names && names[i]) || labels[i] ? `, ${(names && names[i]) || labels[i]}` : ''}`}
               onClick={() => onChange(on ? null : i)}
               className="flex-1 flex flex-col items-center gap-1.5"
               style={{ color: on ? '#f3e9d8' : '#8d91a8', fontSize: 11, fontWeight: 600, lineHeight: 1.15 }}
@@ -2412,6 +3240,8 @@ function DetailView({ entry, onDelete, onEdit }) {
           {entry.body != null && <LevelBar label="Body" value={entry.body} last="Full" />}
         </div>
       )}
+
+      <ConstructionCard value={entry.construction} />
 
       {entry.thirds && (entry.thirds.first || entry.thirds.second || entry.thirds.final) && (
         <div className="mb-6 p-4 rounded-lg" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
@@ -3226,13 +4056,14 @@ function A11yRow({ title, desc, tag, first, children }) {
   );
 }
 
-function AccountView({ userEmail, onLogout, onDeleteAccount }) {
+function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPhoto }) {
   const { settings, effective, update } = useContext(A11yContext);
   const [confirming, setConfirming] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePin, setDeletePin] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [screen, setScreen] = useState('main');
 
   const matching = settings.match;
   const deviceTag = matching ? 'Device' : null;
@@ -3264,6 +4095,10 @@ function AccountView({ userEmail, onLogout, onDeleteAccount }) {
   // point, so nothing visibly changes until the person picks something.
   const setMatch = (on) =>
     on ? update({ match: true }) : update({ match: false, contrast: effective.contrast, motion: effective.motion });
+
+  if (screen === 'download') {
+    return <DownloadJournal onBack={() => setScreen('main')} onLoadAll={onLoadAll} onGetPhoto={onGetPhoto} />;
+  }
 
   return (
     <div className="px-5 pt-4 pb-10 flex flex-col gap-6">
@@ -3307,6 +4142,23 @@ function AccountView({ userEmail, onLogout, onDeleteAccount }) {
             </button>
           )}
         </div>
+      </div>
+
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>
+          Your journal
+        </div>
+        <button
+          onClick={() => setScreen('download')}
+          className="w-full flex items-center gap-3 p-4 rounded-xl text-left"
+          style={panel}
+        >
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-semibold" style={{ color: '#f3e9d8' }}>Download my journal</span>
+            <span className="block text-xs mt-0.5" style={{ color: '#8d91a8' }}>Spreadsheet or printable PDF</span>
+          </span>
+          <ChevronRight size={18} style={{ color: '#696c80' }} aria-hidden="true" />
+        </button>
       </div>
 
       <div>
