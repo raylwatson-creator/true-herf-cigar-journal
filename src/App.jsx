@@ -745,7 +745,8 @@ function GlobalStyles() {
        viewport once installed to the home screen, so pages run past the bottom of the
        screen. 100dvh tracks the actual visible viewport; the 100vh line stays first as a
        fallback for browsers that don't understand dvh yet. */
-    .min-h-screen { min-height: 100vh; min-height: 100dvh; }
+    /* minus the iPhone status-bar strip that body reserves at the top (0 elsewhere) */
+    .min-h-screen { min-height: calc(100vh - env(safe-area-inset-top, 0px)); min-height: calc(100dvh - env(safe-area-inset-top, 0px)); }
     .app-shell {
       background-image:
         radial-gradient(ellipse 700px 420px at 50% -8%, rgba(201,162,39,0.18), transparent 62%),
@@ -927,7 +928,7 @@ function GlobalStyles() {
     }
     .th-nav.th-nav-hidden { transform: translateY(110%); }
     .th-nav-bar {
-      width: 100%; max-width: 448px; pointer-events: auto;
+      width: 100%; max-width: min(448px, 100%); pointer-events: auto;
       display: flex; align-items: stretch; justify-content: space-around;
       padding: 8px 4px calc(10px + env(safe-area-inset-bottom));
       background: #06091a; border-top: 1px solid #283268;
@@ -3497,7 +3498,7 @@ function MarketingStyles() {
         background:
           radial-gradient(1200px 600px at 50% -10%, #101a4a 0%, transparent 60%),
           linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
-        color:var(--cream); min-height:100vh; min-height:100dvh;
+        color:var(--cream); min-height:calc(100vh - env(safe-area-inset-top, 0px)); min-height:calc(100dvh - env(safe-area-inset-top, 0px));
       }
       .th-mkt *{ box-sizing:border-box; }
       .th-mkt h1, .th-mkt h2, .th-mkt h3, .th-mkt .serif{ font-family:'Fraunces', serif; }
@@ -3505,7 +3506,7 @@ function MarketingStyles() {
       .th-mkt a{ color:inherit; text-decoration:none; }
       .th-mkt .wrap{ max-width:1100px; margin:0 auto; padding:0 24px; }
 
-      .th-mkt header.th-topbar{ position:sticky; top:0; z-index:5; background:rgba(6,9,26,.86);
+      .th-mkt header.th-topbar{ position:sticky; top:env(safe-area-inset-top, 0px); z-index:5; background:rgba(6,9,26,.86);
         backdrop-filter:blur(10px); border-bottom:1px solid var(--panel-border); }
       .th-mkt .nav-inner{ display:flex; align-items:center; justify-content:space-between;
         padding:12px 24px; max-width:1100px; margin:0 auto; }
@@ -4829,6 +4830,67 @@ function AgeGate({ onVerified }) {
 }
 
 // ---- top-level: gates the app behind authentication ----
+// Hidden layout check: open the app with ?debug=layout on the end of the address. Shows the
+// page width, the screen width and the widest things on the page, so an iPhone screenshot
+// tells us exactly what is pushing past the edge. Never shown otherwise.
+function LayoutDebug() {
+  const [info, setInfo] = useState(null);
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    const measure = () => {
+      const W = window.innerWidth;
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;top:0;left:0;height:env(safe-area-inset-top,0px);width:1px;visibility:hidden';
+      document.body.appendChild(probe);
+      const safeTop = probe.getBoundingClientRect().height;
+      probe.remove();
+      const wide = [];
+      document.querySelectorAll('body *').forEach((el) => {
+        if (el.closest('[data-layout-debug]')) return;
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && (r.right > W + 1 || r.width > W + 1)) {
+          const cls = typeof el.className === 'string' ? el.className.trim().split(/\s+/).slice(0, 3).join('.') : '';
+          wide.push({ name: `${el.tagName.toLowerCase()}${cls ? '.' + cls : ''}`, left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width) });
+        }
+      });
+      wide.sort((a, b) => b.right - a.right);
+      setInfo({
+        inner: W,
+        client: document.documentElement.clientWidth,
+        scroll: document.documentElement.scrollWidth,
+        visual: window.visualViewport ? Math.round(window.visualViewport.width) : null,
+        safeTop: Math.round(safeTop),
+        wide: wide.slice(0, 6),
+        count: wide.length,
+      });
+    };
+    measure();
+    const t = setInterval(measure, 1500);
+    return () => clearInterval(t);
+  }, []);
+  if (!info) return null;
+  return (
+    <div
+      data-layout-debug
+      style={{ position: 'fixed', left: 6, right: 6, bottom: 96, zIndex: 70, background: 'rgba(42,15,13,0.96)', border: '1px solid #e8705a', borderRadius: 10, padding: '8px 10px', font: '11px/1.35 monospace', color: '#ffd9d0' }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+        <b>layout check</b>
+        <span onClick={() => setOpen((o) => !o)} style={{ textDecoration: 'underline' }}>{open ? 'hide' : 'show'}</span>
+      </div>
+      {open && (
+        <>
+          <div>screen {info.inner} | html {info.client} | scroll {info.scroll} | visual {info.visual ?? 'n/a'} | top inset {info.safeTop}</div>
+          <div>{info.count === 0 ? 'nothing wider than the screen' : `${info.count} wider than the screen:`}</div>
+          {info.wide.map((w, i) => (
+            <div key={i}>{w.name} L{w.left} R{w.right} W{w.width}</div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   // Accessibility settings apply everywhere, including the sign-in screens (PIN visibility),
   // so they are provided here at the very top.
@@ -4877,6 +4939,7 @@ export default function App() {
   return (
     <A11yContext.Provider value={a11y}>
       <MotionConfig reducedMotion={a11y.effective.motion ? 'always' : 'user'}>{screen}</MotionConfig>
+      {new URLSearchParams(window.location.search).get('debug') === 'layout' && <LayoutDebug />}
     </A11yContext.Provider>
   );
 }

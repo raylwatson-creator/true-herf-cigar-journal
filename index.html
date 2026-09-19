@@ -8,6 +8,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="True Herf" />
     <title>True Herf Cigar Journal</title>
+    <style>
+      /* iPhone home-screen app draws under the status bar (black-translucent), so the page
+         starts below it and a navy bar fills the strip. env() is 0 everywhere else. */
+      html { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+      body { padding-top: env(safe-area-inset-top, 0px); box-sizing: border-box; max-width: 100%; overflow-x: clip; overscroll-behavior-x: none; }
+      body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top, 0px); background: #0a0f2e; z-index: 60; pointer-events: none; }
+      input, select, textarea { min-width: 0; max-width: 100%; }
+    </style>
   </head>
   <body style="margin:0; background:#0b0908;">
     <div id="root"></div>
