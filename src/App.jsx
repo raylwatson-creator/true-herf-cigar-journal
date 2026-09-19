@@ -1395,7 +1395,7 @@ function GlobalStyles() {
     .th-nav {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
       display: flex; justify-content: center; pointer-events: none;
-      transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+      transition: transform 0.26s cubic-bezier(0.2, 0.9, 0.3, 1);
     }
     .th-nav.th-nav-hidden { transform: translateY(110%); }
     .th-nav-bar {
@@ -2008,6 +2008,10 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
           </AnimatePresence>
         </div>
       </div>
+
+      {!showSplash && (view === 'stats' || view === 'guide' || (view === 'account' && acctScreen === 'main')) && (
+        <FloatBack onClick={() => go('list')} />
+      )}
 
       <BottomNav tab={navTab} onSelect={(key) => { setOriginPop(null); if (key === 'account') setAcctScreen('main'); go(key); }} visible={navVisible} userEmail={userEmail} />
     </div>
