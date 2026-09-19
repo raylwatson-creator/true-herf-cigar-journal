@@ -268,6 +268,38 @@ const monthLabelNow = () => new Date().toLocaleDateString('en-US', { month: 'lon
 const monthNameNow = () => new Date().toLocaleDateString('en-US', { month: 'long' });
 const shortCategory = (label) => String(label).replace(' Flavors', '');
 
+// 'YYYY-MM' keys for the month picker on Month at a glance / Palate at a glance.
+const monthDateOf = (key) => { const [y, m] = key.split('-').map(Number); return new Date(y, m - 1, 1); };
+const monthLongLabel = (key) => monthDateOf(key).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+const monthShortLabel = (key) => monthDateOf(key).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+const monthOnlyName = (key) => monthDateOf(key).toLocaleDateString('en-US', { month: 'long' });
+
+// One month's entries, newest first.
+function entriesForMonth(entries, key) {
+  return entries
+    .filter((e) => String(e.date).startsWith(key))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
+// Picker options: every month that has an entry, plus the current month and whatever is selected,
+// newest first. countFn turns that month's entries into the number shown beside it.
+function monthOptions(entries, sel, countFn) {
+  const groups = new Map();
+  entries.forEach((e) => {
+    const k = String(e.date).slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(k)) return;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(e);
+  });
+  [monthKey(), sel].forEach((k) => { if (!groups.has(k)) groups.set(k, []); });
+  return [...groups.keys()].sort().reverse().map((k) => ({
+    key: k,
+    label: monthLongLabel(k),
+    short: monthShortLabel(k),
+    count: countFn(groups.get(k)),
+  }));
+}
+
 // This calendar month's entries (dates are stored as local YYYY-MM-DD), newest first.
 function currentMonthEntries(entries) {
   const ym = monthKey();
@@ -351,7 +383,7 @@ function finishShareCanvas(ctx, canvas, W, H) {
 }
 
 // Month at a glance picture: the count and the first 16 photos (4 x 4), then "+N more".
-async function generateMonthImage({ label, total, photos }) {
+async function generateMonthImage({ label, caption, total, photos }) {
   const { canvas, ctx, W, H } = await startShareCanvas();
   ctx.fillStyle = '#f3e9d8';
   ctx.font = '700 88px Fraunces, Georgia, serif';
@@ -361,7 +393,7 @@ async function generateMonthImage({ label, total, photos }) {
   ctx.fillText(String(total), W / 2, 495);
   ctx.fillStyle = '#8d91a8';
   ctx.font = '400 40px "Source Sans 3", sans-serif';
-  ctx.fillText(total === 1 ? 'cigar this month' : 'cigars this month', W / 2, 565);
+  ctx.fillText(caption, W / 2, 565);
 
   const imgs = await Promise.all(photos.map((p) => (p ? loadImage(p).catch(() => null) : null)));
   const cols = 4;
@@ -1496,6 +1528,9 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
   // Account tab sub-screens live here (not in AccountView) so opening a cigar from Month at a
   // glance and pressing Back returns to the same window. 'main' | 'month' | 'monthAll' | 'palate' | 'accessibility' | 'download'
   const [acctScreen, setAcctScreen] = useState('main');
+  // The month showing in Month at a glance / Palate at a glance ('YYYY-MM'); kept here so it survives opening a cigar and coming back.
+  const [monthSel, setMonthSel] = useState(() => monthKey());
+  const [palateSel, setPalateSel] = useState(() => monthKey());
   // Wish list photos arrive separately from the list text: id -> data URL (false = fetch failed).
   const [wishPhotos, setWishPhotos] = useState({});
   const wishPhotosRef = useRef({});
@@ -1957,13 +1992,17 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
                   onGetPhoto={fetchPhoto}
                   screen={acctScreen}
                   setScreen={setAcctScreen}
+                  monthSel={monthSel}
+                  setMonthSel={setMonthSel}
+                  palateSel={palateSel}
+                  setPalateSel={setPalateSel}
                   entries={allEntries}
                   resolvePhoto={resolvePhoto}
                   loadPhotos={loadPhotosFor}
                   onOpenEntry={(id) => openEntry(id, 'account', (allEntries || []).find((e) => e.id === id) || null)}
                 />
               ) : view === 'detail' && active ? (
-                <DetailView entry={active} onDelete={deleteEntry} onEdit={openEdit} />
+                <DetailView entry={active} onDelete={deleteEntry} onEdit={openEdit} onBack={() => go(detailFrom)} />
               ) : null}
             </FlipPage>
           </AnimatePresence>
@@ -2925,7 +2964,7 @@ function DownloadJournal({ onBack, onLoadAll, onGetPhoto }) {
   };
 
   return (
-    <div className="px-5 pt-4 pb-10">
+    <div className="px-5 pt-4 pb-28">
       <div className="flex items-center gap-3 mb-4">
         <button onClick={onBack} className="p-2.5 -ml-1 rounded-full btn-raised-sm" style={{ color: '#c9a227', background: '#131b46' }} aria-label="Back to Account">
           <ChevronLeft size={22} />
@@ -2967,6 +3006,7 @@ function DownloadJournal({ onBack, onLoadAll, onGetPhoto }) {
       <p className="text-xs mt-3 text-center" style={{ color: '#696c80' }}>
         The file is created on your phone. Nothing is sent anywhere.
       </p>
+      <FloatBack onClick={onBack} />
     </div>
   );
 }
@@ -3552,7 +3592,7 @@ function isIOSDevice() {
   return isClassicIOS || isIPadOS13Plus;
 }
 
-function DetailView({ entry, onDelete, onEdit }) {
+function DetailView({ entry, onDelete, onEdit, onBack }) {
   const [confirming, setConfirming] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [activeThird, setActiveThird] = useState('first');
@@ -3603,7 +3643,7 @@ function DetailView({ entry, onDelete, onEdit }) {
   };
 
   return (
-    <div className="px-5 pt-4">
+    <div className="px-5 pt-4 pb-28">
       {entry.photo === undefined && <div className="w-full h-56 rounded-xl mb-4 th-shimmer" aria-hidden="true" />}
       {entry.photo && <DetailPhoto src={entry.photo} />}
       <div className="flex items-start justify-between mb-1">
@@ -3732,6 +3772,7 @@ function DetailView({ entry, onDelete, onEdit }) {
           </button>
         </div>
       )}
+      <FloatBack onClick={onBack} />
     </div>
   );
 }
@@ -4539,28 +4580,114 @@ function FloatBack({ onClick, label = 'Back' }) {
   );
 }
 
-function ScreenHeader({ title, sub, onBack }) {
+function ScreenHeader({ title, sub, onBack, right = null }) {
   return (
     <div className="flex items-center gap-3 mb-4">
-      <button onClick={onBack} className="p-2.5 -ml-1 rounded-full btn-raised-sm" style={{ color: '#c9a227', background: '#131b46' }} aria-label="Back">
+      <button onClick={onBack} className="p-2.5 -ml-1 rounded-full btn-raised-sm shrink-0" style={{ color: '#c9a227', background: '#131b46' }} aria-label="Back">
         <ChevronLeft size={22} />
       </button>
-      <div>
-        <h2 className="font-serif font-semibold" style={{ fontSize: 19, color: '#f3e9d8' }}>{title}</h2>
+      <div className="min-w-0">
+        <h2 className="font-serif font-semibold" style={{ fontSize: 'clamp(16px, 5vw, 19px)', color: '#f3e9d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</h2>
         {sub && <div className="text-xs" style={{ color: '#c9a227' }}>{sub}</div>}
       </div>
+      {right}
     </div>
   );
 }
 
+// "Sep 2026 v" pill, top right of Month / Palate at a glance. The list is drawn through a portal
+// (fixed to the screen) so a short page can never clip it.
+function MonthPicker({ options, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, right: 8 });
+  const btnRef = useRef(null);
+  const cur = options.find((o) => o.key === value);
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+    }
+    setOpen((o) => !o);
+  };
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = () => setOpen(false);
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={toggle}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Month: ${cur ? cur.label : ''}. Change month`}
+        className="ml-auto shrink-0 flex items-center gap-1.5 rounded-full btn-raised-sm"
+        style={{ background: '#131b46', border: '1px solid #283268', color: '#f3e9d8', padding: '9px 12px 9px 14px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+      >
+        {cur ? cur.short : ''}
+        <svg width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M0 0h10L5 6z" fill="#c9a227" /></svg>
+      </button>
+      {open && createPortal(
+        <>
+          <div className="fixed inset-0" style={{ zIndex: 54 }} onClick={() => setOpen(false)} />
+          <div
+            role="listbox"
+            aria-label="Month"
+            style={{
+              position: 'fixed', top: pos.top, right: pos.right, zIndex: 55, width: 236,
+              maxHeight: 'min(300px, 55dvh)', overflowY: 'auto', background: '#0d1334',
+              border: '1px solid #283268', borderRadius: 14, padding: 6, boxShadow: '0 16px 40px rgba(0,0,0,0.7)',
+            }}
+          >
+            {options.map((o) => {
+              const on = o.key === value;
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  role="option"
+                  aria-selected={on}
+                  onClick={() => { onChange(o.key); setOpen(false); }}
+                  className="w-full flex items-center justify-between text-left"
+                  style={{ padding: '11px 12px', borderRadius: 9, fontSize: 14, color: on ? '#c9a227' : '#e8dbc3', fontWeight: on ? 700 : 400, background: on ? '#1a2258' : 'transparent' }}
+                >
+                  <span>{o.label}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: on ? '#c9a227' : '#8d91a8' }}>{o.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>,
+        document.body
+      )}
+    </>
+  );
+}
+
 // Account > Your journal > Month at a glance. `all` = the full list of the month's cigars.
-function MonthGlance({ entries, all, resolvePhoto, loadPhotos, onGetPhoto, onOpen, onShowAll, onBack }) {
-  const list = useMemo(() => (entries ? currentMonthEntries(entries) : null), [entries]);
+function MonthGlance({ entries, sel, onSel, all, resolvePhoto, loadPhotos, onGetPhoto, onOpen, onShowAll, onBack }) {
+  const list = useMemo(() => (entries ? entriesForMonth(entries, sel) : null), [entries, sel]);
+  const options = useMemo(() => (entries ? monthOptions(entries, sel, (l) => l.length) : []), [entries, sel]);
   const [shown, setShown] = useState(30);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
-  const label = monthLabelNow();
-  const monthName = monthNameNow();
+  const label = monthLongLabel(sel);
+  const monthName = monthOnlyName(sel);
+  const isNow = sel === monthKey();
+  useEffect(() => { setShown(30); setNote(''); }, [sel]);
   const panel = { background: '#0a0f2e', border: '1px solid #131a43' };
 
   // The summary needs 12 photos on screen and 16 for the saved picture, so all 16 are fetched up front
@@ -4581,8 +4708,9 @@ function MonthGlance({ entries, all, resolvePhoto, loadPhotos, onGetPhoto, onOpe
         const batch = await Promise.all(top.slice(i, i + 4).map((e) => (e.hasPhoto ? onGetPhoto(e.id) : null)));
         photos.push(...batch);
       }
-      const blob = await generateMonthImage({ label, total: list.length, photos });
-      await saveBlob(blob, `trueherf-month-${monthKey()}.png`);
+      const unit = list.length === 1 ? 'cigar' : 'cigars';
+      const blob = await generateMonthImage({ label, caption: isNow ? `${unit} this month` : `${unit} in ${monthName}`, total: list.length, photos });
+      await saveBlob(blob, `trueherf-month-${sel}.png`);
     } catch (e) {
       setNote('Could not save the picture. Please try again.');
     } finally {
@@ -4594,8 +4722,9 @@ function MonthGlance({ entries, all, resolvePhoto, loadPhotos, onGetPhoto, onOpe
     <div className="px-5 pt-4 pb-28">
       <ScreenHeader
         title={all ? monthName : 'Month at a glance'}
-        sub={all ? `${list ? list.length : 0} ${list && list.length === 1 ? 'cigar' : 'cigars'}, newest first` : label}
+        sub={all ? `${list ? list.length : 0} ${list && list.length === 1 ? 'cigar' : 'cigars'}, newest first` : null}
         onBack={onBack}
+        right={!all && entries ? <MonthPicker options={options} value={sel} onChange={onSel} /> : null}
       />
       {list === null ? (
         <div className="rounded-xl th-shimmer" style={{ height: 300 }} aria-hidden="true" />
@@ -4639,7 +4768,7 @@ function MonthGlance({ entries, all, resolvePhoto, loadPhotos, onGetPhoto, onOpe
           <div className="p-4 rounded-xl mb-4" style={panel}>
             <div className="flex items-baseline gap-2">
               <span className="font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 34, color: '#f3e9d8' }}>{list.length}</span>
-              <span className="text-sm" style={{ color: '#8d91a8' }}>{list.length === 1 ? 'cigar' : 'cigars'} this month</span>
+              <span className="text-sm" style={{ color: '#8d91a8' }}>{list.length === 1 ? 'cigar' : 'cigars'} {isNow ? 'this month' : `in ${monthName}`}</span>
             </div>
             <div className="grid grid-cols-4 gap-2 mt-3">
               {list.slice(0, MONTH_GRID).map((e) => (
@@ -4714,12 +4843,15 @@ function PalateDonut({ cats, total, size = 168, r = 60, sw = 28 }) {
 }
 
 // Account > Your journal > Palate at a glance (this month only; the all-time wheel is in Stats).
-function PalateGlance({ entries, onBack }) {
-  const list = useMemo(() => (entries ? currentMonthEntries(entries) : null), [entries]);
+function PalateGlance({ entries, sel, onSel, onBack }) {
+  const list = useMemo(() => (entries ? entriesForMonth(entries, sel) : null), [entries, sel]);
   const palate = useMemo(() => (list ? buildMonthPalate(list) : null), [list]);
+  const options = useMemo(() => (entries ? monthOptions(entries, sel, (l) => buildMonthPalate(l).total) : []), [entries, sel]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
-  const label = monthLabelNow();
+  const label = monthLongLabel(sel);
+  const monthName = monthOnlyName(sel);
+  useEffect(() => { setNote(''); }, [sel]);
   const panel = { background: '#0a0f2e', border: '1px solid #131a43' };
 
   const save = async () => {
@@ -4728,7 +4860,7 @@ function PalateGlance({ entries, onBack }) {
     setNote('');
     try {
       const blob = await generatePalateImage({ label, cats: palate.cats, total: palate.total });
-      await saveBlob(blob, `trueherf-palate-${monthKey()}.png`);
+      await saveBlob(blob, `trueherf-palate-${sel}.png`);
     } catch (e) {
       setNote('Could not save the picture. Please try again.');
     } finally {
@@ -4738,11 +4870,15 @@ function PalateGlance({ entries, onBack }) {
 
   return (
     <div className="px-5 pt-4 pb-28">
-      <ScreenHeader title="Palate at a glance" sub={label} onBack={onBack} />
+      <ScreenHeader
+        title="Palate at a glance"
+        onBack={onBack}
+        right={entries ? <MonthPicker options={options} value={sel} onChange={onSel} /> : null}
+      />
       {palate === null ? (
         <div className="rounded-xl th-shimmer" style={{ height: 300 }} aria-hidden="true" />
       ) : palate.total === 0 ? (
-        <EmptyState text={`No flavor tags in ${monthNameNow()} yet. Tag flavors in the first, second or final third when you log a cigar.`} />
+        <EmptyState text={`No flavor tags in ${monthName} yet. Tag flavors in the first, second or final third when you log a cigar.`} />
       ) : (
         <>
           <div className="p-4 rounded-xl mb-4" style={panel}>
@@ -4774,7 +4910,7 @@ function PalateGlance({ entries, onBack }) {
   );
 }
 
-function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPhoto, screen, setScreen, entries, resolvePhoto, loadPhotos, onOpenEntry }) {
+function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPhoto, screen, setScreen, monthSel, setMonthSel, palateSel, setPalateSel, entries, resolvePhoto, loadPhotos, onOpenEntry }) {
   const { settings, effective } = useContext(A11yContext);
   const [confirming, setConfirming] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -4834,6 +4970,8 @@ function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPho
     return (
       <MonthGlance
         entries={entries}
+        sel={monthSel}
+        onSel={setMonthSel}
         all={screen === 'monthAll'}
         resolvePhoto={resolvePhoto}
         loadPhotos={loadPhotos}
@@ -4846,7 +4984,7 @@ function AccountView({ userEmail, onLogout, onDeleteAccount, onLoadAll, onGetPho
   }
 
   if (screen === 'palate') {
-    return <PalateGlance entries={entries} onBack={() => setScreen('main')} />;
+    return <PalateGlance entries={entries} sel={palateSel} onSel={setPalateSel} onBack={() => setScreen('main')} />;
   }
 
   if (screen === 'download') {
