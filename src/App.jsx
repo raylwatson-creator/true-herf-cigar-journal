@@ -1519,6 +1519,11 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
   const [stashed, setStashed] = useState(null);
   const [error, setError] = useState('');
   const [showSplash, setShowSplash] = useState(true);
+  // The nav bar starts sliding up while the splash is still fading out (splash is z 50, nav z 40),
+  // so it is already in place the moment the splash clears.
+  const [navEarly, setNavEarly] = useState(false);
+  // Tabs visited before this one (Journal/Stats/Guide/Account). The floating Back button walks back through it.
+  const tabTrailRef = useRef([]);
   // Journal tab: the normal list, or the wish list. wishDraft = a wish-list cigar being logged
   // ("Smoked it"): New Entry opens with it filled in and it leaves the list once the entry saves.
   const [journalTab, setJournalTab] = useState('journal');
@@ -1550,8 +1555,10 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
 
   useEffect(() => {
     // Reduce-motion shows the splash static for a shorter time (matches the CSS in GlobalStyles).
-    const t = setTimeout(() => setShowSplash(false), a11y.motion ? 2600 : 3250);
-    return () => clearTimeout(t);
+    const total = a11y.motion ? 2600 : 3250;
+    const t = setTimeout(() => setShowSplash(false), total);
+    const t2 = setTimeout(() => setNavEarly(true), total - 260);
+    return () => { clearTimeout(t); clearTimeout(t2); };
   }, []);
 
   // ---- photos ----
@@ -1781,6 +1788,24 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
     window.scrollTo(0, 0);
   };
 
+  const TAB_KEYS = ['list', 'stats', 'guide', 'account'];
+  // Remember the tab we are leaving, so Back can return to it.
+  const pushTab = (next) => {
+    if (!TAB_KEYS.includes(next)) return;
+    const here = view === 'detail' ? detailFrom : view;
+    if (!TAB_KEYS.includes(here) || here === next) return;
+    tabTrailRef.current = [...tabTrailRef.current, here].slice(-20);
+  };
+  // Floating Back on Stats / Guide / Account: the previous tab, or the Journal if there is none.
+  const goBackTab = () => {
+    const trail = tabTrailRef.current;
+    const prev = trail.length ? trail[trail.length - 1] : 'list';
+    tabTrailRef.current = trail.slice(0, -1);
+    setOriginPop(null);
+    if (prev === 'account') setAcctScreen('main');
+    go(prev);
+  };
+
   const openEntry = (id, from, entryObj = null) => {
     setActiveId(id);
     setStashed(entryObj);
@@ -1902,7 +1927,7 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
   // A detail page belongs to whichever tab it was opened from.
   const navTab = view === 'detail' ? detailFrom : view;
   const formOpen = view === 'add' || view === 'edit';
-  const navVisible = !showSplash && !formOpen;
+  const navVisible = (!showSplash || navEarly) && !formOpen;
 
   return (
     <div className="min-h-screen w-full relative" style={{ fontFamily: "'Source Sans 3', ui-sans-serif, system-ui" }}>
@@ -2010,10 +2035,10 @@ function CigarJournal({ authToken, userEmail, onLogout }) {
       </div>
 
       {!showSplash && (view === 'stats' || view === 'guide' || (view === 'account' && acctScreen === 'main')) && (
-        <FloatBack onClick={() => go('list')} />
+        <FloatBack onClick={goBackTab} />
       )}
 
-      <BottomNav tab={navTab} onSelect={(key) => { setOriginPop(null); if (key === 'account') setAcctScreen('main'); go(key); }} visible={navVisible} userEmail={userEmail} />
+      <BottomNav tab={navTab} onSelect={(key) => { setOriginPop(null); pushTab(key); if (key === 'account') setAcctScreen('main'); go(key); }} visible={navVisible} userEmail={userEmail} />
     </div>
   );
 }
