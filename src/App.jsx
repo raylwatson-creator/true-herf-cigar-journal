@@ -2138,11 +2138,6 @@ function Header({ view, onBack }) {
           </button>
         )}
         <div>
-          {view === 'list' && (
-            <div className="text-[10px] font-semibold uppercase mb-0.5" style={{ color: '#696c80', letterSpacing: '0.14em' }}>
-              Humidor Journal
-            </div>
-          )}
           {/* Full title, never clipped. Navigation now lives in the bottom bar. */}
           <h1 className="font-serif font-semibold" style={{ fontSize: 19, color: '#f3e9d8', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
             {titles[view]}
@@ -3919,7 +3914,7 @@ function OriginCard({ entries, part, onPart, onPick }) {
   return (
     <div className="p-4 rounded-xl" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
       <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#c9a227' }}>Where your tobacco comes from</div>
-      <div className="text-xs mt-1 mb-3" style={{ color: '#8d91a8' }}>Grouped from the {part} you type on each entry.</div>
+      <div className="text-xs mt-1 mb-3" style={{ color: '#c9ccdf' }}>Grouped from the {part} you type on each entry.</div>
       <StatSeg options={ORIGIN_PARTS} value={part} onChange={onPart} label="Tobacco part" />
 
       {data.total < ORIGIN_MIN_ENTRIES ? (
@@ -4134,7 +4129,7 @@ function PalateCard({ entries }) {
         </div>
       ) : (
         <>
-          <div className="text-xs mt-1 mb-3" style={{ color: '#8d91a8' }}>The longer a wedge, the more often you taste it.</div>
+          <div className="text-xs mt-1 mb-3" style={{ color: '#c9ccdf' }}>The longer a wedge, the more often you taste it.</div>
           <StatSeg options={PALATE_THIRDS} value={third} onChange={setThird} label="Cigar third" />
           <svg viewBox="0 0 320 320" role="group" aria-label="Palate wheel" style={{ display: 'block', margin: '8px auto 0', width: '100%', maxWidth: 320, height: 'auto' }}>
             {[0.33, 0.66, 1].map((f) => (
@@ -4198,7 +4193,7 @@ function PalateCard({ entries }) {
               </>
             )}
           </div>
-          <div className="text-center mt-1.5" style={{ fontSize: 11, color: '#696c80' }}>Wheel is built from the flavor tags you pick in each third.</div>
+          <div className="text-center mt-1.5" style={{ fontSize: 12, color: '#b4b8cf' }}>Wheel is built from the flavor tags you pick in each third.</div>
         </>
       )}
     </div>
@@ -4414,11 +4409,8 @@ function GuideView() {
       </div>
 
       <div>
-        <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#c9a227' }}>
+        <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#c9a227' }}>
           Wrapper Guide
-        </div>
-        <div className="text-sm mb-3" style={{ color: '#696c80' }}>
-          From lightest to darkest — how the wrapper shapes the smoke.
         </div>
         <div className="-mx-5 rounded-xl overflow-hidden" style={{ background: '#0a0f2e', border: '1px solid #131a43' }}>
           <img
