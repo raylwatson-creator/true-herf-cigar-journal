@@ -856,13 +856,24 @@ async function generateEntryImage(entry) {
   const hasLevels = entry.strength != null || entry.body != null;
   const barsH = hasLevels ? 132 : 0;
 
+  // Construction (optional, same as the detail page's Construction card): Draw, Burn, Ash and
+  // Relights as one row of chips, only the ones that were filled in.
+  const cons = entry.construction || {};
+  const consItems = [
+    cons.draw != null && ['DRAW', DRAW_LABELS[cons.draw]],
+    cons.burn != null && ['BURN', BURN_LABELS[cons.burn]],
+    cons.ash != null && ['ASH', ASH_LABELS[cons.ash]],
+    cons.relights != null && ['RELIGHTS', relightsText(cons.relights)],
+  ].filter(Boolean);
+  const consH = consItems.length ? 48 + 96 + 36 : 0;
+
   // reclaim photo height for long notes so the card never overflows/clips
   let photoH = photoImg ? maxPhotoH : 0;
   if (photoImg && thirdsList.length) {
     const neededFull = measureThirds(1);
-    const fixedNonPhotoH = 48 + 264 + metaExtraRowsH + 140 + barsH + 92 + 160;
+    const fixedNonPhotoH = 48 + 264 + metaExtraRowsH + 140 + barsH + consH + 92 + 160;
     const idealPhotoH = H - fixedNonPhotoH - neededFull;
-    photoH = Math.max(minPhotoH, Math.min(maxPhotoH, idealPhotoH));
+    photoH = Math.max(minPhotoH - consH, Math.min(maxPhotoH, idealPhotoH));
   }
 
   // background — deep tobacco leather with soft vignette
@@ -994,6 +1005,33 @@ async function generateEntryImage(entry) {
       ctx.textAlign = 'left';
     });
     y += barsH;
+  }
+
+  if (consItems.length) {
+    ctx.fillStyle = '#c9a227';
+    ctx.font = '600 28px "Source Sans 3", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('CONSTRUCTION', pad, y + 22);
+    const chipGap = 16;
+    const chipW = (contentW - chipGap * (consItems.length - 1)) / consItems.length;
+    consItems.forEach(([label, value], i) => {
+      const cx = pad + i * (chipW + chipGap);
+      const cy = y + 44;
+      ctx.fillStyle = '#131b46';
+      ctx.strokeStyle = '#1b2455';
+      ctx.lineWidth = 2;
+      roundRectPath(ctx, cx, cy, chipW, 96, 20);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#8d91a8';
+      ctx.font = '600 22px "Source Sans 3", sans-serif';
+      ctx.fillText(label, cx + 22, cy + 36);
+      ctx.fillStyle = '#f3e9d8';
+      const fit = fitTextToWidth(ctx, value, '600 ', 30, 20, chipW - 40, '"Source Sans 3", sans-serif');
+      ctx.font = `600 ${fit.size}px "Source Sans 3", sans-serif`;
+      ctx.fillText(fit.text, cx + 22, cy + 76);
+    });
+    y += consH;
   }
 
   if (thirdsList.length) {
@@ -4131,7 +4169,7 @@ function PalateCard({ entries }) {
         <>
           <div className="text-xs mt-1 mb-3" style={{ color: '#c9ccdf' }}>The longer a wedge, the more often you taste it.</div>
           <StatSeg options={PALATE_THIRDS} value={third} onChange={setThird} label="Cigar third" />
-          <svg viewBox="0 0 320 320" role="group" aria-label="Palate wheel" style={{ display: 'block', margin: '8px auto 0', width: '100%', maxWidth: 320, height: 'auto' }}>
+          <svg viewBox="0 0 320 320" role="group" aria-label="Palate wheel" style={{ display: 'block', margin: '8px auto 0', width: '100%', maxWidth: 320, height: 'auto', WebkitTapHighlightColor: 'transparent' }}>
             {[0.33, 0.66, 1].map((f) => (
               <circle key={f} cx={cx} cy={cy} r={r0 + (rmax - r0) * f} fill="none" stroke="#131a43" strokeDasharray="2 4" />
             ))}
@@ -4150,7 +4188,7 @@ function PalateCard({ entries }) {
                     opacity={on ? 1 : 0.72}
                     stroke={on ? '#f3e9d8' : 'none'}
                     strokeWidth="1.5"
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                     role="button"
                     tabIndex={0}
                     aria-label={`${shortLabel(c)}, ${c.v} tags`}
