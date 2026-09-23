@@ -5394,6 +5394,224 @@ function MarketingStyles() {
       .th-mkt .foot-links{ display:flex; gap:22px; font-size:12.5px; color:var(--muted-dim); }
       .th-mkt .foot-copy{ font-size:12px; color:var(--muted-dim); }
 
+      /* ---------- landing page: new sections (Sep 2026 update) ---------- */
+      .th-mkt .hero{ position:relative; padding-left:20px; padding-right:20px; }
+      .th-mkt .brand-name{ white-space:nowrap; }
+      .th-mkt .seg{ display:flex; background:rgba(0,0,0,.3); border:1px solid var(--panel-border); border-radius:9px; padding:2px; margin-bottom:10px; }
+      .th-mkt .seg div{ flex:1; text-align:center; font-size:9.5px; font-weight:700; padding:5px 0; border-radius:7px; color:var(--muted); transition:background .3s, color .3s; }
+      .th-mkt .seg .on{ background:linear-gradient(180deg,var(--copper-1),var(--copper-2)); color:#fff2e2; }
+      .th-mkt .phone-screen.th-flex{ display:flex; flex-direction:column; padding-bottom:0; }
+      .th-mkt .ph-pips{ display:flex; gap:2px; margin-top:3px; align-items:center; font-size:7.5px; color:var(--muted-dim); }
+      .th-mkt .ph-pips i{ width:7px; height:4px; border-radius:1px; background:var(--panel-border); display:block; }
+      .th-mkt .ph-pips i.f{ background:var(--gold); }
+      .th-mkt .ph-nav{ margin-top:auto; display:flex; justify-content:space-around; align-items:flex-end; padding:8px 0 10px;
+        border-top:1px solid var(--panel-border); background:rgba(6,9,26,.6); margin-left:-12px; margin-right:-12px; }
+      .th-mkt .ph-nav div{ font-size:8px; color:var(--muted-dim); display:flex; flex-direction:column; align-items:center; gap:3px; }
+      .th-mkt .ph-nav div.on{ color:var(--gold); }
+      .th-mkt .ph-nav svg{ width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:2; }
+      .th-mkt .ph-nav .add{ width:30px; height:30px; border-radius:50%; background:linear-gradient(180deg,var(--copper-1),var(--copper-2));
+        display:flex; align-items:center; justify-content:center; margin-top:-14px; box-shadow:0 4px 10px rgba(0,0,0,.5); }
+      .th-mkt .ph-nav .add svg{ stroke:#fff2e2; }
+
+      .th-mkt .tag-new{ position:absolute; top:12px; left:12px; font:700 9.5px 'Source Sans 3', sans-serif; letter-spacing:.12em;
+        color:#1a1400; background:linear-gradient(180deg,var(--gold-bright),var(--gold)); padding:3px 8px; border-radius:999px; }
+      .th-mkt .tag-new.outline{ background:transparent; color:var(--gold); border:1px solid rgba(201,162,39,.5); }
+      .th-mkt .feat-card{ position:relative; }
+      .th-mkt .feat-card .tag-new{ top:24px; left:auto; right:20px; }
+
+      .th-mkt .new-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:20px; max-width:960px; margin:0 auto; }
+      .th-mkt .new-card{ background:var(--panel); border:1px solid var(--panel-border); border-radius:18px; overflow:hidden; display:flex; flex-direction:column; }
+      .th-mkt .new-vis{ min-height:196px; background:radial-gradient(300px 160px at 50% 0%, rgba(201,162,39,.10), transparent 70%), #0d1230;
+        border-bottom:1px solid var(--panel-border); display:flex; align-items:center; justify-content:center; padding:36px 16px 14px; position:relative; overflow:hidden; }
+      .th-mkt .new-body{ padding:20px 22px 22px; }
+      .th-mkt .new-body h3{ font-size:18px; color:var(--cream); margin-bottom:6px; font-weight:600; }
+      .th-mkt .new-body p{ font-size:13.5px; color:var(--muted); }
+
+      .th-mkt .wl{ width:100%; max-width:300px; position:relative; }
+      .th-mkt .wl-row{ display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--panel-border); border-radius:11px; padding:7px; margin-bottom:7px; }
+      .th-mkt .wl-row .ph-thumb{ width:38px; height:38px; }
+      .th-mkt .wl-cam{ width:38px; height:38px; border-radius:8px; border:1px dashed var(--panel-border); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+      .th-mkt .wl-cam svg{ width:16px; height:16px; stroke:var(--muted-dim); fill:none; stroke-width:2; }
+      .th-mkt .wl-note{ font-size:9px; color:var(--muted-dim); font-style:italic; }
+      .th-mkt .smoked{ font:700 9.5px 'Source Sans 3', sans-serif; color:#fff2e2; background:linear-gradient(180deg,var(--copper-1),var(--copper-2)); border-radius:7px; padding:5px 8px; white-space:nowrap; }
+      .th-mkt .logged{ position:absolute; top:-26px; right:6px; font:700 10px 'Source Sans 3', sans-serif; color:#1a1400; background:var(--gold-bright);
+        border-radius:999px; padding:3px 9px; opacity:0; }
+
+      .th-mkt .glance{ display:flex; gap:14px; align-items:center; }
+      .th-mkt .gl-panel{ background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:10px; }
+      .th-mkt .gl-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; gap:8px; }
+      .th-mkt .gl-title{ font:700 10.5px 'Fraunces', serif; color:var(--cream); }
+      .th-mkt .pill{ font-size:8.5px; color:var(--gold-bright); border:1px solid rgba(201,162,39,.45); border-radius:999px; padding:1px 7px; white-space:nowrap; }
+      .th-mkt .mgrid{ display:grid; grid-template-columns:repeat(4,22px); gap:3px; }
+      .th-mkt .mgrid i{ display:block; width:22px; height:22px; border-radius:4px; background:linear-gradient(135deg,var(--a),var(--b)); }
+      .th-mkt .gl-count{ font:700 9px 'JetBrains Mono', monospace; color:var(--gold-bright); margin-top:6px; }
+      .th-mkt .donut{ position:relative; width:84px; height:84px; border-radius:50%; margin:0 auto;
+        background:conic-gradient(#8B5E3C 0 34%, #C9A227 34% 58%, #B5652F 58% 76%, #6E7F3A 76% 88%, #7A4A6B 88% 100%);
+        -webkit-mask:radial-gradient(circle, transparent 23px, #000 24px); mask:radial-gradient(circle, transparent 23px, #000 24px); }
+      .th-mkt .leg{ font-size:8.5px; color:var(--muted); margin-top:6px; line-height:1.5; }
+      .th-mkt .leg b{ color:var(--cream-dim); font-weight:600; }
+
+      .th-mkt .orig{ width:100%; max-width:300px; background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:11px 12px; }
+      .th-mkt .orow{ display:grid; grid-template-columns:92px 1fr 30px; gap:8px; align-items:center; font-size:9.5px; margin-bottom:6px; color:var(--cream-dim); }
+      .th-mkt .obar{ height:7px; border-radius:4px; background:rgba(255,255,255,.06); overflow:hidden; }
+      .th-mkt .obar span{ display:block; height:100%; background:linear-gradient(90deg,var(--gold),var(--gold-bright)); border-radius:4px; }
+      .th-mkt .orow .n{ font:700 9px 'JetBrains Mono', monospace; color:var(--muted); text-align:right; }
+      .th-mkt .orow.sm{ grid-template-columns:62px 1fr 16px; font-size:8px; }
+      .th-mkt .orow.sm .n{ font-size:8px; }
+
+      .th-mkt .dl{ display:flex; gap:14px; align-items:center; }
+      .th-mkt .file{ width:74px; height:92px; border-radius:8px; background:var(--panel); border:1px solid var(--panel-border); position:relative; padding:24px 8px 8px; }
+      .th-mkt .file::before{ content:''; position:absolute; top:0; right:0; width:18px; height:18px; background:linear-gradient(225deg,#06091A 50%, var(--panel-border) 50%); border-top-right-radius:8px; }
+      .th-mkt .file .ext{ font:700 13px 'JetBrains Mono', monospace; color:var(--gold-bright); }
+      .th-mkt .file .ln{ height:3px; border-radius:2px; background:rgba(255,255,255,.1); margin-top:5px; }
+      .th-mkt .dl-arrow{ width:34px; height:34px; border-radius:50%; background:linear-gradient(180deg,var(--copper-1),var(--copper-2)); display:flex; align-items:center; justify-content:center; }
+      .th-mkt .dl-arrow svg{ width:16px; height:16px; stroke:#fff2e2; fill:none; stroke-width:2.4; }
+
+      .th-mkt .mini-panel{ background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:8px; margin-bottom:8px; }
+      .th-mkt .mini-h{ font:700 9.5px 'Fraunces', serif; color:var(--cream); margin-bottom:6px; }
+      .th-mkt .wheel{ width:92px; height:92px; border-radius:50%; margin:4px auto 2px;
+        background:conic-gradient(#C9A227 0 10%, #B5652F 10% 20%, #6b5a3a 20% 30%, #8B5E3C 30% 40%, #d8c7a0 40% 50%, #4a2f18 50% 60%, #9b3d3d 60% 70%, #7A4A6B 70% 80%, #6E7F3A 80% 90%, #a07a2a 90% 100%);
+        -webkit-mask:radial-gradient(circle, transparent 18px, #000 19px); mask:radial-gradient(circle, transparent 18px, #000 19px); }
+
+      .th-mkt .price-list li.nw{ color:var(--cream); }
+      .th-mkt .price-list li.nw::after{ content:'NEW'; font:700 8.5px 'Source Sans 3', sans-serif; letter-spacing:.1em; color:var(--gold);
+        border:1px solid rgba(201,162,39,.5); border-radius:999px; padding:1px 6px; margin-left:auto; align-self:center; }
+      .th-mkt .price-list{ max-width:310px; }
+
+      /* ---------- landing page motion (respects Reduce motion, see bottom) ---------- */
+      @property --thm-p { syntax:'<percentage>'; inherits:false; initial-value:0%; }
+
+      /* the page burns like a cigar as you scroll */
+      .th-mkt .burn{ position:absolute; left:0; right:0; bottom:-1px; height:4px; background:linear-gradient(90deg,#6b4226,#8a5a2f 40%,#5a3820); pointer-events:none; }
+      .th-mkt .burn .ash{ position:absolute; left:0; top:0; bottom:0; width:0; background:repeating-linear-gradient(90deg,#9a9aa2 0 6px,#7c7c86 6px 9px,#b1b1b8 9px 14px); }
+      .th-mkt .burn .tip{ position:absolute; top:-3px; left:0; width:12px; height:10px; margin-left:-6px; border-radius:50%;
+        background:radial-gradient(circle,#ffd27a 0%,#ff7a1a 45%,rgba(255,80,0,0) 75%); animation:thm-ember 1.4s ease-in-out infinite; }
+      @keyframes thm-ember{ 0%,100%{ opacity:.85; transform:scale(1); } 50%{ opacity:1; transform:scale(1.35); } }
+
+      /* hero: embers, smoke, floating + tilting phone, gold shine */
+      .th-mkt .embers{ position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:0; }
+      .th-mkt .embers i{ position:absolute; bottom:-10px; border-radius:50%; background:#ffb347;
+        box-shadow:0 0 8px 2px rgba(255,140,40,.7); opacity:0; animation:thm-rise linear infinite; }
+      @keyframes thm-rise{ 0%{ transform:translate(0,0); opacity:0; } 10%{ opacity:.9; } 70%{ opacity:.5; } 100%{ transform:translate(var(--dx,20px),-520px); opacity:0; } }
+      .th-mkt .hero-grid{ position:relative; z-index:1; }
+      .th-mkt .phone-stage{ position:relative; }
+      .th-mkt .smoke{ position:absolute; left:50%; top:-40px; width:320px; height:420px; transform:translateX(-50%); pointer-events:none; z-index:0; }
+      .th-mkt .smoke span{ position:absolute; bottom:0; left:50%; width:130px; height:130px; margin-left:-65px; border-radius:50%;
+        background:radial-gradient(circle, rgba(232,219,195,.16), rgba(232,219,195,0) 70%); filter:blur(14px); opacity:0; animation:thm-smoke 9s ease-out infinite; }
+      .th-mkt .smoke span:nth-child(2){ animation-delay:3s; --sx:-60px; }
+      .th-mkt .smoke span:nth-child(3){ animation-delay:6s; --sx:50px; }
+      @keyframes thm-smoke{ 0%{ transform:translate(0,40px) scale(.6); opacity:0; } 20%{ opacity:1; } 100%{ transform:translate(var(--sx,30px),-330px) scale(2.2) rotate(40deg); opacity:0; } }
+      .th-mkt .phone-float{ position:relative; z-index:1; perspective:900px; animation:thm-float 6s ease-in-out infinite; }
+      @keyframes thm-float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-12px); } }
+      .th-mkt .phone-float .phone{ transition:transform .25s ease-out; }
+      .th-mkt .hero .ph-card{ opacity:0; animation:thm-slide .6s cubic-bezier(.2,.8,.2,1) forwards; }
+      @keyframes thm-slide{ from{ opacity:0; transform:translateX(24px); } to{ opacity:1; transform:none; } }
+      .th-mkt .hero .ph-pips i.f{ transform:scaleX(0); transform-origin:left; animation:thm-pip .3s ease-out forwards; }
+      @keyframes thm-pip{ to{ transform:scaleX(1); } }
+      .th-mkt .hero h1 em{ background:linear-gradient(100deg,#C9A227 20%,#fff1b8 40%,#E4C34A 50%,#C9A227 70%); background-size:250% 100%;
+        -webkit-background-clip:text; background-clip:text; color:transparent; animation:thm-shine 5s ease-in-out infinite; }
+      @keyframes thm-shine{ 0%{ background-position:100% 0; } 60%,100%{ background-position:-50% 0; } }
+      .th-mkt .hero .eyebrow, .th-mkt .hero h1, .th-mkt .hero .lede, .th-mkt .hero .hero-ctas, .th-mkt .hero .reassure, .th-mkt .hero .already-member{
+        opacity:0; animation:thm-up .7s ease-out forwards; }
+      .th-mkt .hero h1{ animation-delay:.1s; } .th-mkt .hero .lede{ animation-delay:.25s; } .th-mkt .hero .hero-ctas{ animation-delay:.4s; }
+      .th-mkt .hero .reassure{ animation-delay:.55s; } .th-mkt .hero .already-member{ animation-delay:.65s; }
+      @keyframes thm-up{ from{ opacity:0; transform:translateY(18px); } to{ opacity:1; transform:none; } }
+
+      /* copper buttons: a gold glint every few seconds */
+      .th-mkt .btn-primary{ position:relative; overflow:hidden; }
+      .th-mkt .btn-primary::after{ content:''; position:absolute; top:0; bottom:0; left:-60%; width:40%; pointer-events:none;
+        background:linear-gradient(100deg,transparent,rgba(255,236,190,.45),transparent); transform:skewX(-20deg); animation:thm-glint 4.5s ease-in-out infinite; }
+      @keyframes thm-glint{ 0%,70%{ left:-60%; } 100%{ left:130%; } }
+
+      /* scroll reveal: .thm-rv gets .thm-in when it scrolls into view */
+      .th-mkt .thm-rv{ opacity:0; transform:translateY(28px); transition:opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1); transition-delay:var(--d,0s); }
+      .th-mkt .thm-rv.thm-in{ opacity:1; transform:none; }
+      .th-mkt .feat-card.thm-rv .feat-ic{ transform:scale(.4) rotate(-30deg); transition:transform .6s cubic-bezier(.34,1.56,.64,1); transition-delay:calc(var(--d,0s) + .25s); }
+      .th-mkt .feat-card.thm-in .feat-ic{ transform:none; }
+      .th-mkt .feat-card.thm-in:hover{ transform:translateY(-2px); box-shadow:0 10px 30px -12px rgba(201,162,39,.35); }
+      .th-mkt .feat-card:hover .feat-ic svg{ animation:thm-wiggle .5s ease; }
+      @keyframes thm-wiggle{ 25%{ transform:rotate(-12deg); } 75%{ transform:rotate(12deg); } }
+      .th-mkt .tag-new{ animation:thm-pulse 2.4s ease-in-out infinite; }
+      @keyframes thm-pulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(228,195,74,.55); } 50%{ box-shadow:0 0 0 6px rgba(228,195,74,0); } }
+
+      /* wish list: first cigar gets smoked, logs itself, a new wish slides in */
+      .th-mkt .wl-row.anim, .th-mkt .wl-row.anim .smoked, .th-mkt .logged{ animation-play-state:paused; }
+      .th-mkt .wl-row.anim{ animation:thm-wish 7s ease-in-out infinite; }
+      .th-mkt .wl-row.anim .smoked{ animation:thm-press 7s ease-in-out infinite; }
+      .th-mkt .logged{ animation:thm-logged 7s ease-in-out infinite; }
+      .th-mkt .thm-in .wl-row.anim, .th-mkt .thm-in .wl-row.anim .smoked, .th-mkt .thm-in .logged{ animation-play-state:running; }
+      @keyframes thm-wish{ 0%,30%{ transform:none; opacity:1; } 38%{ transform:scale(1.03); } 50%{ transform:translateX(120%); opacity:0; }
+        60%{ transform:translateX(-40px); opacity:0; } 72%,100%{ transform:none; opacity:1; } }
+      @keyframes thm-press{ 0%,28%{ transform:none; } 31%{ transform:translateY(2px) scale(.94); filter:brightness(1.3); } 34%,100%{ transform:none; } }
+      @keyframes thm-logged{ 0%,36%{ opacity:0; transform:translateY(6px); } 42%,56%{ opacity:1; transform:none; } 64%,100%{ opacity:0; transform:translateY(-6px); } }
+
+      /* month tiles drop in, palate donut draws itself */
+      .th-mkt .mgrid i{ opacity:0; transform:scale(.3); transition:opacity .35s, transform .45s cubic-bezier(.34,1.56,.64,1); transition-delay:calc(var(--i) * 70ms + .2s); }
+      .th-mkt .thm-in .mgrid i{ opacity:1; transform:none; }
+      .th-mkt .donut::after{ content:''; position:absolute; inset:-1px; border-radius:50%; --thm-p:0%;
+        background:conic-gradient(transparent 0 var(--thm-p), var(--panel) var(--thm-p) 100%); transition:--thm-p 1.6s ease-out .5s; }
+      .th-mkt .thm-in .donut::after{ --thm-p:100%; }
+      .th-mkt .thm-in .donut{ animation:thm-spin-in 1.6s ease-out .5s both; }
+      @keyframes thm-spin-in{ from{ transform:rotate(-90deg); } to{ transform:none; } }
+
+      /* origin bars grow (and regrow when the switch changes) */
+      .th-mkt .obar span{ transform:scaleX(0); transform-origin:left; transition:transform 1s cubic-bezier(.2,.8,.2,1); }
+      .th-mkt .thm-in .obar span{ transform:scaleX(1); }
+
+      /* download: files lift, arrow pulses */
+      .th-mkt .thm-in .file{ animation:thm-bob 3s ease-in-out infinite; }
+      .th-mkt .thm-in .file:last-child{ animation-delay:.6s; }
+      @keyframes thm-bob{ 0%,100%{ transform:translateY(0) rotate(-2deg); } 50%{ transform:translateY(-8px) rotate(2deg); } }
+      .th-mkt .thm-in .dl-arrow{ animation:thm-drop 1.5s ease-in-out infinite; }
+      @keyframes thm-drop{ 0%,100%{ transform:translateY(-3px); box-shadow:0 0 0 0 rgba(181,101,47,.6); } 50%{ transform:translateY(3px); box-shadow:0 0 0 8px rgba(181,101,47,0); } }
+
+      /* closer look */
+      .th-mkt .shots .phone{ transition:transform .4s ease; }
+      .th-mkt .shots > div:hover .phone{ transform:translateY(-8px) rotate(-1deg); }
+      .th-mkt .wheel{ animation:thm-turn 30s linear infinite; }
+      @keyframes thm-turn{ to{ transform:rotate(360deg); } }
+      .th-mkt .shots .flavor-chip{ opacity:0; transform:scale(.5); transition:opacity .4s, transform .4s cubic-bezier(.34,1.56,.64,1); }
+      .th-mkt .thm-in .flavor-chip{ opacity:1; transform:none; }
+      .th-mkt .thm-in .flavor-chip:nth-of-type(2){ transition-delay:.15s; }
+      .th-mkt .thm-in .flavor-chip:nth-of-type(3){ transition-delay:.3s; }
+      .th-mkt .thm-in .flavor-chip:nth-of-type(4){ transition-delay:.45s; }
+
+      /* price: circling gold border, list ticks in */
+      .th-mkt .price-wrap{ position:relative; max-width:444px; margin:0 auto; border-radius:24px; padding:2px; overflow:hidden; background:rgba(201,162,39,.28); }
+      .th-mkt .price-wrap::before{ content:''; position:absolute; inset:-50%; background:conic-gradient(from 0deg, transparent 0 70%, #E4C34A 85%, transparent 100%);
+        animation:thm-turn 6s linear infinite; }
+      .th-mkt .price-wrap .price-card{ position:relative; border-color:transparent; }
+      .th-mkt .price-list li{ opacity:0; transform:translateX(-12px); transition:opacity .4s ease, transform .4s ease; transition-delay:calc(var(--i) * 80ms + .3s); }
+      .th-mkt .thm-in .price-list li{ opacity:1; transform:none; }
+      .th-mkt .faq details[open] p{ animation:thm-up .35s ease-out; }
+
+      /* Reduce motion (Account > Accessibility, or the phone's own setting): calm and fully visible */
+      [data-th-motion="1"] .th-mkt *, [data-th-motion="1"] .th-mkt *::before, [data-th-motion="1"] .th-mkt *::after{ animation:none !important; transition:none !important; }
+      [data-th-motion="1"] .th-mkt .thm-rv, [data-th-motion="1"] .th-mkt .hero *, [data-th-motion="1"] .th-mkt .mgrid i,
+      [data-th-motion="1"] .th-mkt .price-list li, [data-th-motion="1"] .th-mkt .flavor-chip{ opacity:1 !important; transform:none !important; }
+      [data-th-motion="1"] .th-mkt .obar span, [data-th-motion="1"] .th-mkt .ph-pips i.f{ transform:none !important; }
+      [data-th-motion="1"] .th-mkt .donut::after, [data-th-motion="1"] .th-mkt .embers, [data-th-motion="1"] .th-mkt .smoke,
+      [data-th-motion="1"] .th-mkt .logged, [data-th-motion="1"] .th-mkt .btn-primary::after{ display:none; }
+      [data-th-motion="1"] .th-mkt .hero h1 em{ color:var(--gold-bright); }
+      @media (prefers-reduced-motion: reduce){
+        .th-mkt *, .th-mkt *::before, .th-mkt *::after{ animation:none !important; transition:none !important; }
+        .th-mkt .thm-rv, .th-mkt .hero *, .th-mkt .mgrid i, .th-mkt .price-list li, .th-mkt .flavor-chip{ opacity:1 !important; transform:none !important; }
+        .th-mkt .obar span, .th-mkt .ph-pips i.f{ transform:none !important; }
+        .th-mkt .donut::after, .th-mkt .embers, .th-mkt .smoke, .th-mkt .logged, .th-mkt .btn-primary::after{ display:none; }
+        .th-mkt .hero h1 em{ color:var(--gold-bright); }
+      }
+      @media (max-width:860px){
+        .th-mkt .new-grid{ grid-template-columns:1fr; max-width:480px; }
+      }
+      @media (max-width:520px){
+        .th-mkt .brand-name small{ display:none; }
+        .th-mkt .nav-inner{ padding:10px 16px; }
+        .th-mkt .hero{ padding-left:16px; padding-right:16px; }
+        .th-mkt .glance{ gap:8px; }
+        .th-mkt .mgrid{ grid-template-columns:repeat(4,19px); }
+        .th-mkt .mgrid i{ width:19px; height:19px; }
+      }
+
       /* ---------- checkout ---------- */
       .th-mkt .th-checkout-wrap{ padding:40px 16px 80px; }
       .th-mkt .topbar{ width:100%; max-width:920px; display:flex; align-items:center;
@@ -5535,66 +5753,278 @@ function CheckIcon() {
   );
 }
 
-function PhoneMock() {
+function PhoneMock({ phoneRef }) {
+  const cards = [
+    { brand: 'Padrón', name: '1964 Anniversary Toro', stars: '★★★★★', str: 4 },
+    { brand: 'My Father', name: 'Le Bijou 1922 Robusto', stars: '★★★★½', str: 3, c1: '#8a5a2f', c2: '#4a2f18' },
+    { brand: 'Don Valdi', name: 'Nicaraguan Toro', stars: '★★★★★', str: 5, c1: '#5a3820', c2: '#2c1a0e' },
+  ];
   return (
-    <div className="phone">
-      <div className="phone-screen">
+    <div className="phone" ref={phoneRef}>
+      <div className="phone-screen th-flex">
         <div className="ph-title">Humidor Journal</div>
-        <div className="ph-sub">12 cigars logged</div>
+        <div className="ph-sub">42 cigars logged</div>
+        <div className="seg"><div className="on">Journal</div><div>Wish list</div></div>
         <div className="ph-search">Search brand, notes, flavor…</div>
-        <div className="ph-card">
-          <div className="ph-thumb"></div>
-          <div className="ph-meta">
-            <div className="ph-brand">Padrón</div>
-            <div className="ph-name">1964 Anniversary Toro</div>
-            <div className="ph-stars">★★★★★</div>
+        {cards.map((c, ci) => (
+          <div className="ph-card" key={c.brand} style={{ animationDelay: `${0.5 + ci * 0.25}s` }}>
+            <div className="ph-thumb" style={c.c1 ? { '--c1': c.c1, '--c2': c.c2 } : undefined}></div>
+            <div className="ph-meta">
+              <div className="ph-brand">{c.brand}</div>
+              <div className="ph-name">{c.name}</div>
+              <div className="ph-stars">{c.stars}</div>
+              <div className="ph-pips">
+                Strength{' '}
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <i key={i} className={i < c.str ? 'f' : ''} style={i < c.str ? { animationDelay: `${0.9 + ci * 0.25 + i * 0.08}s` } : undefined}></i>
+                ))}
+              </div>
+            </div>
           </div>
+        ))}
+        <div className="ph-nav">
+          <div className="on"><svg viewBox="0 0 24 24"><path d="M4 4h12a4 4 0 014 4v12H8a4 4 0 01-4-4z" /></svg>Journal</div>
+          <div><svg viewBox="0 0 24 24"><path d="M3 3v18h18" /><path d="M7 15l4-4 3 3 5-6" /></svg>Stats</div>
+          <div><span className="add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></span>Add</div>
+          <div><svg viewBox="0 0 24 24"><path d="M3 17l14-14 4 4-14 14H3z" /></svg>Guide</div>
+          <div><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" /></svg>Account</div>
         </div>
-        <div className="ph-card">
-          <div className="ph-thumb" style={{ '--c1': '#8a5a2f', '--c2': '#4a2f18' }}></div>
-          <div className="ph-meta">
-            <div className="ph-brand">My Father</div>
-            <div className="ph-name">Le Bijou 1922 Robusto</div>
-            <div className="ph-stars">★★★★☆</div>
-          </div>
-        </div>
-        <div className="ph-card">
-          <div className="ph-thumb"></div>
-          <div className="ph-meta">
-            <div className="ph-brand">Don Valdi</div>
-            <div className="ph-name">Nicaraguan Toro</div>
-            <div className="ph-stars">★★★★★</div>
-          </div>
-        </div>
-        <div className="ph-tabs">
-          <div className="ph-tab active"><div className="ico"></div>List</div>
-          <div className="ph-tab"><div className="ico"></div>Stats</div>
-          <div className="ph-tab"><div className="ico"></div>Guide</div>
-        </div>
-        <div className="ph-fab">+</div>
       </div>
     </div>
   );
 }
 
 const FEATURES = [
-  { path: 'M12 2v20M2 12h20', title: 'Log every detail', body: "Brand, line, vitola, wrapper, binder, filler, price, pairing, and a photo. Every cigar, fully recorded." },
-  { path: 'M12 17.3l-5.4 3 1.4-6-4.7-4 6.1-.5L12 4l2.6 5.8 6.1.5-4.7 4 1.4 6z', title: 'Half-star ratings', body: 'Rate with real precision: tap the left or right half of any star, down to the 0.5.' },
-  { path: 'M12 3v18M3 12h18', title: 'Flavor wheel, by the thirds', body: 'Separate tasting notes for the first, second, and final third, each with its own 10-category flavor wheel.', circle: true },
-  { path: 'M3 9h18M8 2v4M16 2v4', title: 'Cigar Calendar', body: 'Every logged day shows the cigar itself, right on the calendar. Tap in to relive it.', rect: true },
-  { path: 'M7 15l4-4 3 3 5-6', title: 'Your stats', body: "Your top flavor notes and a full Cigar Calendar of everything you've logged.", frame: true },
-  { path: 'M12 3v12M8 8l4-5 4 5M5 21h14', title: 'Share an entry', body: 'Download any cigar as a beautiful shareable card: photo, rating, and notes, ready to post.' },
+  { icon: <path d="M12 2v20M2 12h20" />, title: 'Log every detail', body: 'Brand, line, vitola, wrapper, binder, filler, strength, body, price, pairing and a photo. Every cigar, fully recorded.' },
+  { tag: 'NEW', icon: <path d="M13 2L4 14h7l-1 8 9-12h-7z" />, title: 'Faster logging', body: "Smoking one you've had before? Start typing and True Herf fills in the size, wrapper, binder and filler from your own journal." },
+  { icon: <path d="M12 17.3l-5.4 3 1.4-6-4.7-4 6.1-.5L12 4l2.6 5.8 6.1.5-4.7 4 1.4 6z" />, title: 'Half-star ratings', body: 'Rate with real precision: tap the left or right half of any star, down to the 0.5.' },
+  { icon: <><circle cx="12" cy="12" r="9" /><path d="M12 3v18M3 12h18" /></>, title: 'Flavor wheel, by the thirds', body: 'Separate tasting notes for the first, second and final third, each with its own 10-category flavor wheel.' },
+  { tag: 'NEW', icon: <><path d="M3 12h13" /><path d="M16 9h3a2 2 0 012 2v2a2 2 0 01-2 2h-3z" /><path d="M6 8c0-2 2-2 2-4M10 8c0-2 2-2 2-4" /></>, title: 'Construction notes', body: 'Rate the draw, burn and ash, and count your relights. Optional, for the nights the build matters as much as the blend.' },
+  { tag: 'UPDATED', icon: <><path d="M3 3v18h18" /><path d="M7 15l4-4 3 3 5-6" /></>, title: 'Your stats', body: 'Where your tobacco comes from, your palate wheel, and a Cigar Calendar with every smoke right on the day you had it.' },
+  { icon: <path d="M12 3v12M8 8l4-5 4 5M5 21h14" />, title: 'Share an entry', body: 'Download any cigar as a beautiful shareable card: photo, rating and notes, ready to post.' },
+  { icon: <path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20" />, title: 'Built-in guide', body: 'Vitola sizes, the wrapper spectrum from Double Claro to Oscuro, and how to light it right.' },
+  { tag: 'NEW', icon: <><circle cx="12" cy="12" r="3" /><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /></>, title: 'Easy on the eyes', body: "Larger text, high contrast, bigger buttons and calmer motion. Match your phone's settings or set your own." },
 ];
 
 function FeatureIcon({ f }) {
+  return <svg viewBox="0 0 24 24" strokeWidth="2">{f.icon}</svg>;
+}
+
+// True when the visitor wants calm pages: the app's Reduce motion setting (mirrored onto
+// <html data-th-motion>) or the phone's own setting.
+function landingCalm() {
+  if (typeof document !== 'undefined' && document.documentElement.dataset.thMotion === '1') return true;
+  return typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+// Counts a number up once, the first time it scrolls into view.
+function CountUp({ to, decimals = 0, prefix = '', ms = 1300 }) {
+  const ref = useRef(null);
+  const [val, setVal] = useState(to);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || landingCalm() || !('IntersectionObserver' in window)) { setVal(to); return undefined; }
+    let raf = 0;
+    setVal(0);
+    const io = new IntersectionObserver(([en]) => {
+      if (!en.isIntersecting) return;
+      io.disconnect();
+      const t0 = performance.now();
+      const tick = (t) => {
+        const f = Math.min(1, (t - t0) / ms);
+        setVal(to * (1 - Math.pow(1 - f, 3)));
+        if (f < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    }, { threshold: 0.3 });
+    io.observe(el);
+    return () => { io.disconnect(); cancelAnimationFrame(raf); };
+  }, [to, ms]);
+  return <span ref={ref}>{prefix}{val.toFixed(decimals)}</span>;
+}
+
+const ORIGIN_SETS = [
+  [['Nicaragua', 88, 16], ['Ecuador', 62, 11], ['Dominican Rep.', 40, 7], ['Other or blends', 26, 5]],
+  [['Nicaragua', 94, 19], ['Mexico', 45, 8], ['Dominican Rep.', 34, 6], ['Other or blends', 30, 6]],
+  [['Nicaragua', 90, 21], ['Dominican Rep.', 55, 12], ['Honduras', 30, 5], ['Other or blends', 22, 4]],
+];
+
+// "Where your tobacco comes from" preview: cycles Wrapper, Binder, Filler and regrows the bars.
+function OriginPreview() {
+  const [idx, setIdx] = useState(0);
+  const [shrink, setShrink] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    let t2 = 0;
+    const t = setInterval(() => {
+      if (landingCalm() || document.hidden) return;
+      const card = ref.current && ref.current.closest('.thm-rv');
+      if (card && !card.classList.contains('thm-in')) return;
+      setShrink(true);
+      t2 = setTimeout(() => { setIdx((i) => (i + 1) % 3); setShrink(false); }, 450);
+    }, 3500);
+    return () => { clearInterval(t); clearTimeout(t2); };
+  }, []);
   return (
-    <svg viewBox="0 0 24 24" strokeWidth="2">
-      {f.circle && <circle cx="12" cy="12" r="9" />}
-      {f.rect && <rect x="3" y="4" width="18" height="17" rx="2" />}
-      {f.frame && <path d="M3 3v18h18" />}
-      <path d={f.path} />
-    </svg>
+    <div className="orig" ref={ref}>
+      <div className="gl-title" style={{ marginBottom: 7 }}>Where your tobacco comes from</div>
+      <div className="seg">
+        {['Wrapper', 'Binder', 'Filler'].map((l, i) => <div key={l} className={i === idx ? 'on' : ''}>{l}</div>)}
+      </div>
+      {ORIGIN_SETS[idx].map(([name, w, n], i) => (
+        <div className="orow" key={i}>
+          <span>{name}</span>
+          <div className="obar">
+            <span style={{ width: `${w}%`, opacity: i === 3 ? 0.55 : 1, transitionDelay: `${i * 0.1}s`, transform: shrink ? 'scaleX(0)' : undefined }}></span>
+          </div>
+          <span className="n">{n}</span>
+        </div>
+      ))}
+    </div>
   );
+}
+
+const MONTH_TILES = [
+  ['#6b4226', '#3a2414'], ['#8a5a2f', '#4a2f18'], ['#5a3820', '#2c1a0e'], ['#9a6a3a', '#4a2f18'],
+  ['#4a2f18', '#2a1a0c'], ['#7a4a26', '#3a2414'], ['#6b4226', '#2c1a0e'], ['#8a5a2f', '#3a2414'],
+  ['#5a3820', '#3a2414'], ['#9a6a3a', '#5a3820'], ['#6b4226', '#4a2f18'], ['#3a2414', '#1a0e06'],
+];
+
+function WhatsNewSection() {
+  return (
+    <section id="new">
+      <div className="wrap">
+        <div className="section-head thm-rv">
+          <div className="eyebrow"><span className="dot"></span> Fresh in the humidor</div>
+          <h2>New in True Herf</h2>
+          <p>The journal keeps getting better. Every update is included in your one-time purchase.</p>
+        </div>
+        <div className="new-grid">
+          <div className="new-card thm-rv">
+            <div className="new-vis"><span className="tag-new">NEW</span>
+              <div className="wl">
+                <div className="logged">✓ Logged to your journal</div>
+                <div className="wl-row anim">
+                  <div className="ph-thumb" style={{ '--c1': '#7a4a26', '--c2': '#3a2414' }}></div>
+                  <div className="ph-meta"><div className="ph-brand">Oliva</div><div className="ph-name">Serie V Melanio</div><div className="wl-note">Saw it at the lounge</div></div>
+                  <div className="smoked">Smoked it</div>
+                </div>
+                <div className="wl-row">
+                  <div className="wl-cam"><svg viewBox="0 0 24 24"><path d="M4 7h3l2-3h6l2 3h3v13H4z" /><circle cx="12" cy="13" r="4" /></svg></div>
+                  <div className="ph-meta"><div className="ph-brand">Arturo Fuente</div><div className="ph-name">Hemingway Short Story</div><div className="wl-note">Birthday pick</div></div>
+                  <div className="smoked">Smoked it</div>
+                </div>
+              </div>
+            </div>
+            <div className="new-body">
+              <h3>Wish list</h3>
+              <p>Save the cigars you want to try next, with a photo of the band so you remember it. Tap "Smoked it" and your new entry starts already filled in.</p>
+            </div>
+          </div>
+
+          <div className="new-card thm-rv" style={{ '--d': '0.12s' }}>
+            <div className="new-vis"><span className="tag-new">NEW</span>
+              <div className="glance">
+                <div className="gl-panel">
+                  <div className="gl-head"><span className="gl-title">Month at a glance</span><span className="pill">Sep 2026 ▾</span></div>
+                  <div className="mgrid">
+                    {MONTH_TILES.map(([a, b], i) => <i key={i} style={{ '--a': a, '--b': b, '--i': i }}></i>)}
+                  </div>
+                  <div className="gl-count"><CountUp to={14} /> cigars this month</div>
+                </div>
+                <div className="gl-panel" style={{ width: 120 }}>
+                  <div className="gl-head"><span className="gl-title">Palate</span><span className="pill">Sep ▾</span></div>
+                  <div className="donut"></div>
+                  <div className="leg"><b>Wood</b> 34% · <b>Sweet</b> 24%<br /><b>Spice</b> 18%</div>
+                </div>
+              </div>
+            </div>
+            <div className="new-body">
+              <h3>Month and Palate at a glance</h3>
+              <p>See every cigar from any month in one view, and what your palate leaned toward. Save either one as a picture, ready to post.</p>
+            </div>
+          </div>
+
+          <div className="new-card thm-rv">
+            <div className="new-vis"><span className="tag-new">NEW</span><OriginPreview /></div>
+            <div className="new-body">
+              <h3>Know your tobacco</h3>
+              <p>Stats now maps where your wrapper, binder and filler come from, plus a palate wheel of your favorite flavors, by the whole cigar or by the third.</p>
+            </div>
+          </div>
+
+          <div className="new-card thm-rv" style={{ '--d': '0.12s' }}>
+            <div className="new-vis"><span className="tag-new">NEW</span>
+              <div className="dl">
+                <div className="file"><div className="ext">CSV</div><div className="ln"></div><div className="ln" style={{ width: '70%' }}></div><div className="ln"></div></div>
+                <div className="dl-arrow"><svg viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M5 20h14" /></svg></div>
+                <div className="file"><div className="ext">PDF</div><div className="ln"></div><div className="ln" style={{ width: '60%' }}></div><div className="ln"></div></div>
+              </div>
+            </div>
+            <div className="new-body">
+              <h3>Download my journal</h3>
+              <p>Your notes belong to you. Export every entry as a spreadsheet or a PDF with photos, anytime, from the Account tab.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Scroll reveal, the cigar burn bar, and the hero phone tilt for the landing page.
+function useLandingMotion(rootRef, heroRef, phoneRef, ashRef, tipRef) {
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    const items = root.querySelectorAll('.thm-rv');
+    let io = null;
+    if (landingCalm() || !('IntersectionObserver' in window)) {
+      items.forEach((el) => el.classList.add('thm-in'));
+    } else {
+      io = new IntersectionObserver((entries) => {
+        entries.forEach((en) => {
+          if (!en.isIntersecting) return;
+          en.target.classList.add('thm-in');
+          io.unobserve(en.target);
+        });
+      }, { threshold: 0.18 });
+      items.forEach((el) => io.observe(el));
+    }
+
+    let raf = 0;
+    const burn = () => {
+      raf = 0;
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      const f = h > 0 ? Math.min(1, Math.max(0, window.scrollY / h)) : 0;
+      if (ashRef.current) ashRef.current.style.width = `${f * 100}%`;
+      if (tipRef.current) tipRef.current.style.left = `${f * 100}%`;
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(burn); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    burn();
+
+    const hero = heroRef.current;
+    const onMove = (ev) => {
+      const phone = phoneRef.current;
+      if (!phone || ev.pointerType !== 'mouse' || landingCalm()) return;
+      const r = hero.getBoundingClientRect();
+      const x = (ev.clientX - r.left) / r.width - 0.5;
+      const y = (ev.clientY - r.top) / r.height - 0.5;
+      phone.style.transform = `rotateY(${x * 14}deg) rotateX(${-y * 10}deg)`;
+    };
+    const onLeave = () => { if (phoneRef.current) phoneRef.current.style.transform = ''; };
+    hero?.addEventListener('pointermove', onMove);
+    hero?.addEventListener('pointerleave', onLeave);
+
+    return () => {
+      io?.disconnect();
+      window.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      hero?.removeEventListener('pointermove', onMove);
+      hero?.removeEventListener('pointerleave', onLeave);
+    };
+  }, []);
 }
 
 function InstallSection() {
@@ -5672,8 +6102,21 @@ function InstallStep({ icon, title, body }) {
 // signed-out visitor -- App() checks getStoredAuth() before this component exists,
 // so a returning member with a valid session never sees it at all.
 function LandingPage({ onCheckout, onLogin }) {
+  const rootRef = useRef(null);
+  const heroRef = useRef(null);
+  const phoneRef = useRef(null);
+  const ashRef = useRef(null);
+  const tipRef = useRef(null);
+  useLandingMotion(rootRef, heroRef, phoneRef, ashRef, tipRef);
+  const embers = useMemo(() => Array.from({ length: 18 }, () => ({
+    left: `${Math.random() * 100}%`,
+    size: 2 + Math.random() * 3,
+    dx: `${Math.random() * 80 - 40}px`,
+    dur: `${6 + Math.random() * 6}s`,
+    delay: `${Math.random() * 8}s`,
+  })), []);
   return (
-    <div className="th-mkt">
+    <div className="th-mkt" ref={rootRef}>
       <GlobalStyles />
       <MarketingStyles />
       <header className="th-topbar">
@@ -5687,14 +6130,20 @@ function LandingPage({ onCheckout, onLogin }) {
             <button className="btn btn-primary btn-nav" onClick={onCheckout}>Start Your Journal</button>
           </div>
         </div>
+        <div className="burn" aria-hidden="true"><div className="ash" ref={ashRef}></div><div className="tip" ref={tipRef}></div></div>
       </header>
 
-      <div className="wrap hero">
+      <div className="wrap hero" ref={heroRef}>
+        <div className="embers" aria-hidden="true">
+          {embers.map((e, i) => (
+            <i key={i} style={{ left: e.left, width: e.size, height: e.size, '--dx': e.dx, animationDuration: e.dur, animationDelay: e.delay }}></i>
+          ))}
+        </div>
         <div className="hero-grid">
           <div>
             <div className="eyebrow"><span className="dot"></span> One-time purchase · No subscription</div>
             <h1>Every cigar has a story.<br /><em>Keep yours.</em></h1>
-            <p className="lede">A private, ad-free journal for logging every cigar you smoke: tasting notes by the thirds, half-star ratings, photos, and a flavor wheel built for the real thing. Pay once. It's yours for good.</p>
+            <p className="lede">A private, ad-free journal for every cigar you smoke: tasting notes by the thirds, half-star ratings, a wish list for what's next, and monthly recaps worth sharing. Pay once. It's yours for good.</p>
             <div className="hero-ctas">
               <button className="btn btn-primary" onClick={onCheckout}>Start Your Journal</button>
               <div className="price-tiny">
@@ -5709,18 +6158,21 @@ function LandingPage({ onCheckout, onLogin }) {
             </div>
             <div className="already-member">Already a member? <a onClick={onLogin}>Log in</a> instead, no payment needed.</div>
           </div>
-          <PhoneMock />
+          <div className="phone-stage">
+            <div className="smoke" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div className="phone-float"><PhoneMock phoneRef={phoneRef} /></div>
+          </div>
         </div>
       </div>
 
       <section id="video">
-        <div className="wrap section-head">
+        <div className="wrap section-head thm-rv">
           <div className="eyebrow"><span className="dot"></span> See it in action</div>
           <h2>A real walkthrough, no cuts</h2>
           <p>Screen recorded straight from the app, logging a cigar from the brand field to the flavor wheel.</p>
         </div>
         <div className="wrap">
-          <div className="video-box">
+          <div className="video-box thm-rv">
             <video controls playsInline muted autoPlay loop preload="auto">
               <source src="/th-demo-walkthrough.webm" type="video/webm" />
               <source src="/th-demo-walkthrough.mp4" type="video/mp4" />
@@ -5729,16 +6181,19 @@ function LandingPage({ onCheckout, onLogin }) {
         </div>
       </section>
 
+      <WhatsNewSection />
+
       <section id="features">
         <div className="wrap">
-          <div className="section-head">
+          <div className="section-head thm-rv">
             <div className="eyebrow"><span className="dot"></span> What you get</div>
             <h2>Built for people who actually smoke cigars</h2>
             <p>Not an inventory tracker. A real journal for the ritual itself.</p>
           </div>
           <div className="feat-grid">
-            {FEATURES.map((f) => (
-              <div className="feat-card" key={f.title}>
+            {FEATURES.map((f, i) => (
+              <div className="feat-card thm-rv" key={f.title} style={{ '--d': `${(i % 3) * 0.12}s` }}>
+                {f.tag && <span className={`tag-new${f.tag === 'NEW' ? '' : ' outline'}`}>{f.tag}</span>}
                 <div className="feat-ic"><FeatureIcon f={f} /></div>
                 <h3>{f.title}</h3>
                 <p>{f.body}</p>
@@ -5750,12 +6205,12 @@ function LandingPage({ onCheckout, onLogin }) {
 
       <section id="shots">
         <div className="wrap">
-          <div className="section-head">
+          <div className="section-head thm-rv">
             <div className="eyebrow"><span className="dot"></span> A closer look</div>
             <h2>Every screen, built to enhance the experience</h2>
           </div>
           <div className="shots">
-            <div>
+            <div className="thm-rv">
               <div className="phone" style={{ width: 220 }}>
                 <div className="phone-screen" style={{ minHeight: 400, paddingTop: 24 }}>
                   <div className="ph-title" style={{ fontSize: 13 }}>First Third</div>
@@ -5770,32 +6225,28 @@ function LandingPage({ onCheckout, onLogin }) {
               </div>
               <div className="shot-cap"><b>Flavor wheel</b>, by the thirds</div>
             </div>
-            <div>
+            <div className="thm-rv" style={{ '--d': '0.12s' }}>
               <div className="phone" style={{ width: 220 }}>
                 <div className="phone-screen" style={{ minHeight: 400, paddingTop: 24 }}>
                   <div className="ph-title" style={{ fontSize: 13 }}>Stats</div>
-                  <div className="ph-sub" style={{ marginBottom: 10 }}>18 cigars logged</div>
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90, marginBottom: 14 }}>
-                    <div style={{ flex: 1, height: '60%', background: 'var(--gold)', borderRadius: '4px 4px 0 0', opacity: .9 }}></div>
-                    <div style={{ flex: 1, height: '90%', background: 'var(--gold)', borderRadius: '4px 4px 0 0' }}></div>
-                    <div style={{ flex: 1, height: '40%', background: 'var(--gold)', borderRadius: '4px 4px 0 0', opacity: .7 }}></div>
-                    <div style={{ flex: 1, height: '70%', background: 'var(--gold)', borderRadius: '4px 4px 0 0', opacity: .85 }}></div>
+                  <div className="ph-sub" style={{ marginBottom: 10 }}>42 cigars logged</div>
+                  <div className="mini-panel">
+                    <div className="mini-h">Where your tobacco comes from</div>
+                    {[['Nicaragua', 88, 16], ['Ecuador', 62, 11], ['Dominican', 40, 7]].map(([n, w, c], i) => (
+                      <div className="orow sm" key={n} style={i === 2 ? { marginBottom: 0 } : undefined}>
+                        <span>{n}</span><div className="obar"><span style={{ width: `${w}%`, transitionDelay: `${i * 0.1}s` }}></span></div><span className="n">{c}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3 }}>
-                    <div style={{ gridColumn: 'span 7', fontSize: 8, color: 'var(--muted)', marginBottom: 2 }}>August</div>
-                    <div style={{ aspectRatio: '1', background: 'var(--panel-border)', borderRadius: 3 }}></div>
-                    <div style={{ aspectRatio: '1', background: 'var(--gold)', opacity: .5, borderRadius: 3 }}></div>
-                    <div style={{ aspectRatio: '1', background: 'var(--panel-border)', borderRadius: 3 }}></div>
-                    <div style={{ aspectRatio: '1', background: 'var(--gold)', borderRadius: 3 }}></div>
-                    <div style={{ aspectRatio: '1', background: 'var(--panel-border)', borderRadius: 3 }}></div>
-                    <div style={{ aspectRatio: '1', background: 'var(--panel-border)', borderRadius: 3 }}></div>
-                    <div style={{ aspectRatio: '1', background: 'var(--gold)', opacity: .7, borderRadius: 3 }}></div>
+                  <div className="mini-panel">
+                    <div className="mini-h">Your palate</div>
+                    <div className="wheel"></div>
                   </div>
                 </div>
               </div>
-              <div className="shot-cap"><b>Cigar Calendar</b>: your history at a glance</div>
+              <div className="shot-cap"><b>Stats</b>: origins and your palate</div>
             </div>
-            <div>
+            <div className="thm-rv" style={{ '--d': '0.24s' }}>
               <div className="phone" style={{ width: 220 }}>
                 <div className="phone-screen" style={{ minHeight: 400, paddingTop: 24 }}>
                   <div style={{ height: 150, borderRadius: 12, background: 'linear-gradient(135deg,#5a3820,#2c1a0e)', marginBottom: 10, position: 'relative' }}>
@@ -5814,29 +6265,39 @@ function LandingPage({ onCheckout, onLogin }) {
 
       <section id="pricing">
         <div className="wrap">
-          <div className="section-head">
+          <div className="section-head thm-rv">
             <div className="eyebrow"><span className="dot"></span> Simple pricing</div>
             <h2>Pay once. Smoke on.</h2>
           </div>
-          <div className="price-card">
-            <div className="big">$2.99</div>
-            <div className="per">one time, not $2.99/month, not $2.99/year</div>
-            <ul className="price-list">
-              <li><CheckIcon /> Unlimited cigars, forever</li>
-              <li><CheckIcon /> Full flavor wheel &amp; tasting notes by the thirds</li>
-              <li><CheckIcon /> Stats, Cigar Calendar &amp; top flavor notes</li>
-              <li><CheckIcon /> Built-in vitola &amp; wrapper guide</li>
-              <li><CheckIcon /> Shareable entry cards</li>
-              <li><CheckIcon /> Your data, synced &amp; private, never sold</li>
-            </ul>
-            <button className="btn btn-primary" onClick={onCheckout}>Start Your Journal</button>
+          <div className="price-wrap thm-rv">
+            <div className="price-card">
+              <div className="big"><CountUp to={2.99} decimals={2} prefix="$" ms={1200} /></div>
+              <div className="per">one time, not $2.99/month, not $2.99/year</div>
+              <ul className="price-list">
+                {[
+                  ['Unlimited cigars, forever'],
+                  ['Full flavor wheel & tasting notes by the thirds'],
+                  ['Strength, body & construction notes', true],
+                  ["Wish list for what's next", true],
+                  ['Month & Palate at a glance', true],
+                  ['Stats, tobacco origins & Cigar Calendar'],
+                  ['Built-in vitola & wrapper guide'],
+                  ['Shareable entry cards'],
+                  ['Download your journal anytime', true],
+                  ['Your data, synced & private, never sold'],
+                ].map(([t, nw], i) => (
+                  <li key={t} className={nw ? 'nw' : undefined} style={{ '--i': i }}><CheckIcon /> {t}</li>
+                ))}
+              </ul>
+              <button className="btn btn-primary" onClick={onCheckout}>Start Your Journal</button>
+            </div>
           </div>
         </div>
       </section>
 
       <section id="how">
         <div className="wrap">
-          <div className="section-head">
+          <div className="section-head thm-rv">
             <div className="eyebrow"><span className="dot"></span> After you buy</div>
             <h2>From payment to your first entry</h2>
           </div>
@@ -5864,7 +6325,7 @@ function LandingPage({ onCheckout, onLogin }) {
 
       <section id="faq">
         <div className="wrap">
-          <div className="section-head">
+          <div className="section-head thm-rv">
             <div className="eyebrow"><span className="dot"></span> Questions</div>
             <h2>Good to know</h2>
           </div>
@@ -5874,8 +6335,16 @@ function LandingPage({ onCheckout, onLogin }) {
               <p>Yes: $2.99, once. No subscription, no recurring charge, no "free trial" that quietly starts billing you.</p>
             </details>
             <details>
+              <summary>Do I get new features for free?</summary>
+              <p>Yes. Everything added since launch, like the wish list and the monthly recaps, was included for every member at no extra cost, and future updates will be too.</p>
+            </details>
+            <details>
               <summary>Do I need to download this from an app store?</summary>
               <p>No. It installs right from your browser, see "Get it on your phone" above for the exact steps, no App Store or Play Store required.</p>
+            </details>
+            <details>
+              <summary>Can I get my notes out of the app?</summary>
+              <p>Anytime. The Account tab lets you download your whole journal as a spreadsheet (CSV) or a PDF, with or without photos.</p>
             </details>
             <details>
               <summary>What if I lose my access link?</summary>
